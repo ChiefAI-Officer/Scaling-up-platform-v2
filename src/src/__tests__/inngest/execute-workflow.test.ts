@@ -296,6 +296,21 @@ describe("execute-workflow Inngest function", () => {
     });
   });
 
+  it("preserves the legacy workshopDate copy while the timezone wave is killed", async () => {
+    process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+    process.env.WAVE_TZ_ZONE_PICKER_KILL = "1";
+    findUnique.mockResolvedValue(makeAssignment());
+
+    await invoke();
+
+    const context = mockInterpolate.mock.calls.find(
+      ([, candidate]) => typeof candidate?.workshopDate === "string",
+    )?.[1];
+    expect(context?.workshopDate).toBe("Monday, June 15, 2026");
+    delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+    delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
+  });
+
   // ------------------------------------------------------------------
   // 4. EMAIL_STAFF: sends to admin email
   // ------------------------------------------------------------------

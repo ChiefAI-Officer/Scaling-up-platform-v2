@@ -76,7 +76,7 @@ export interface InviteSendDb {
 export interface InviteEmailInput {
   invitation: { id: string; expiresAt: Date };
   respondent: { id: string; firstName: string; lastName: string; email: string };
-  campaign: { id: string; name: string; alias: string; closeAt: Date | null };
+  campaign: { id: string; name: string; alias: string; closeAt: Date | null; timezone?: string };
   template: { alias: string; invitationSubject: string; invitationBodyMarkdown: string };
   /** Per-campaign full-HTML invitation override (#20) — REPLACES the shell when non-empty (+ flag on). */
   invitationBodyHtml?: string | null;
@@ -201,6 +201,7 @@ export interface SendInvitesInput {
     name: string;
     alias: string;
     closeAt: Date | null;
+    timezone?: string;
     /** Per-campaign overrides (null → fall back to template defaults). */
     invitationSubject: string | null;
     invitationBodyMarkdown: string | null;
@@ -380,6 +381,7 @@ export async function sendInvitesBatch(
         name: campaign.name,
         alias: campaign.alias,
         closeAt: campaign.closeAt,
+        timezone: campaign.timezone,
       },
       template: {
         alias: campaign.template.alias,

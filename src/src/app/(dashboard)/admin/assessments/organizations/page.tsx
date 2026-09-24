@@ -27,6 +27,7 @@ import {
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { PageHeader } from "@/components/ui/page-header";
 import { isMemberPortalEnabled } from "@/lib/members/flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 export default async function AdminAssessmentOrganizationsPage() {
   const mobileResponsiveEnabled = isMobileResponsiveEnabled();
@@ -47,6 +48,7 @@ export default async function AdminAssessmentOrganizationsPage() {
       name: true,
       ownerCoachId: true,
       externalId: true,
+      timezone: true,
       // #86 — the owning coach's name drives the admin "by coach" grouping.
       owner: { select: { firstName: true, lastName: true } },
     },
@@ -58,6 +60,7 @@ export default async function AdminAssessmentOrganizationsPage() {
     ownerCoachId: o.ownerCoachId,
     ownerCoachName: `${o.owner.firstName} ${o.owner.lastName}`.trim() || null,
     externalId: o.externalId,
+    timezone: o.timezone,
   }));
 
   return (
@@ -98,6 +101,7 @@ export default async function AdminAssessmentOrganizationsPage() {
         allowGroupByCoach
         responsiveEnabled={mobileResponsiveEnabled}
         memberPortalEnabled={isMemberPortalEnabled()}
+        timezonePickerEnabled={timezonePickerEnabled()}
       />
     </div>
   );

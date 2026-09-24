@@ -21,6 +21,7 @@ import {
 import { ApprovalThread } from "@/components/approvals/approval-thread";
 import { CoachReplyForm } from "@/components/approvals/coach-reply-form";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 const APP_URL = process.env.APP_URL || "https://scaling-up-platform-v2.vercel.app";
 
@@ -450,6 +451,8 @@ export default async function WorkshopDetailsPage({
             priceCents={workshop.priceCents}
             isFree={workshop.isFree}
             pricingTierId={workshop.pricingTierId}
+            registrationCount={workshop.registrations.length}
+            timezonePickerEnabled={timezonePickerEnabled()}
           />
         </>
       )}

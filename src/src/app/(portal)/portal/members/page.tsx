@@ -20,6 +20,7 @@ import {
 } from "@/components/organizations/members-teams-view";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { isMemberLedTeamsEnabled, isMemberPortalEnabled } from "@/lib/members/flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 export default async function MembersPage() {
   const { coach } = await requireCoach();
@@ -28,7 +29,7 @@ export default async function MembersPage() {
   const organizations = await db.organization.findMany({
     where: { ownerCoachId: coach.id, deletedAt: null },
     orderBy: { createdAt: "desc" },
-    select: { id: true, name: true, ownerCoachId: true, externalId: true },
+    select: { id: true, name: true, ownerCoachId: true, externalId: true, timezone: true },
   });
 
   const items: OrgSummary[] = organizations.map((o) => ({
@@ -36,6 +37,7 @@ export default async function MembersPage() {
     name: o.name,
     ownerCoachId: o.ownerCoachId,
     externalId: o.externalId,
+    timezone: o.timezone,
   }));
 
   return (
@@ -55,6 +57,7 @@ export default async function MembersPage() {
           responsiveEnabled={mobileResponsiveEnabled}
           memberPortalEnabled={isMemberPortalEnabled()}
           memberLedTeamsEnabled={isMemberLedTeamsEnabled()}
+          timezonePickerEnabled={timezonePickerEnabled()}
         />
       </FadeUp>
     </div>

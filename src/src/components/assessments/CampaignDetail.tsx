@@ -79,6 +79,7 @@ import {
   ResponsiveActionsItem,
   ResponsiveActionsMenu,
 } from "@/components/ui/responsive-actions-menu";
+import { formatInZone, fromInstant, toInstant, DEFAULT_TIMEZONE } from "@/lib/time";
 
 const REASON_MAX_LENGTH = 500;
 
@@ -203,6 +204,8 @@ export interface CampaignDetailProps {
   memberPortalAccessWarning?: boolean;
   /** Release 4 Coach send controls, resolved server-side for invited campaigns only. */
   memberPortalSendEnabled?: boolean;
+  /** Enables campaign-zone display and the extend-only deadline flow. */
+  timezonePickerEnabled?: boolean;
 }
 
 interface OrgRespondentRow {
@@ -264,6 +267,14 @@ function formatDateTime(d: Date | string | null | undefined): string {
   });
 }
 
+function formatLocalPreview(localValue: string, timezone: string): string | null {
+  try {
+    return formatInZone(toInstant(localValue, timezone), timezone);
+  } catch {
+    return null;
+  }
+}
+
 function StatusPill({
   status,
   toneMap,
@@ -311,6 +322,7 @@ export function CampaignDetail({
   responsiveEnabled = false,
   memberPortalAccessWarning = false,
   memberPortalSendEnabled = false,
+  timezonePickerEnabled = false,
 }: CampaignDetailProps) {
   const { toast } = useToast();
   const router = useRouter();
@@ -462,11 +474,79 @@ export function CampaignDetail({
   // to the OPENED display.
   const [openAtEditing, setOpenAtEditing] = useState(false);
   const [openAtDraft, setOpenAtDraft] = useState<string>(() =>
-    formatDateTimeLocal(new Date(overview.campaign.openAt)),
+    timezonePickerEnabled
+      ? fromInstant(
+          overview.campaign.openAt,
+          overview.campaign.timezone ?? DEFAULT_TIMEZONE,
+        )
+      : formatDateTimeLocal(new Date(overview.campaign.openAt)),
   );
   const [openAtSaving, setOpenAtSaving] = useState(false);
+  const [extendOpen, setExtendOpen] = useState(false);
+  const [extendDraft, setExtendDraft] = useState("");
+  const [extendPreview, setExtendPreview] = useState<{
+    affectedCount: number;
+    completedCount: number;
+  } | null>(null);
+  const [extendLoading, setExtendLoading] = useState(false);
+  const [extendNotify, setExtendNotify] = useState(false);
+  const [extendError, setExtendError] = useState<string | null>(null);
 
   const campaign = overview.campaign;
+  const campaignTimezone = campaign.timezone ?? DEFAULT_TIMEZONE;
+
+  async function openExtendDialog() {
+    if (!campaign.closeAt) return;
+    setExtendOpen(true);
+    setExtendError(null);
+    setExtendDraft(fromInstant(campaign.closeAt, campaignTimezone));
+    setExtendLoading(true);
+    try {
+      const response = await fetch(`/api/assessment-campaigns/${campaign.id}/extend-deadline`);
+      const body = await response.json();
+      if (!response.ok || !body.success) throw new Error(body.error || "Could not load deadline impact");
+      setExtendPreview({
+        affectedCount: body.data.affectedCount,
+        completedCount: body.data.completedCount,
+      });
+    } catch (error) {
+      setExtendError(error instanceof Error ? error.message : "Could not load deadline impact");
+    } finally {
+      setExtendLoading(false);
+    }
+  }
+
+  async function handleExtendDeadline() {
+    setExtendLoading(true);
+    setExtendError(null);
+    try {
+      const closeAt = toInstant(extendDraft, campaignTimezone);
+      const response = await fetch(`/api/assessment-campaigns/${campaign.id}/extend-deadline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ closeAt: closeAt.toISOString(), notifyAffected: extendNotify }),
+      });
+      const body = await response.json();
+      if (!response.ok || !body.success) {
+        const message = Array.isArray(body.error) ? body.error[0]?.message : body.error;
+        throw new Error(message || "Could not extend deadline");
+      }
+      setOverview((current) => ({
+        ...current,
+        campaign: { ...current.campaign, closeAt: new Date(body.data.closeAt) },
+      }));
+      setExtendOpen(false);
+      toast({
+        title: "Deadline extended",
+        description: `${body.data.affectedCount} invitation link${body.data.affectedCount === 1 ? "" : "s"} extended.`,
+      });
+      router.refresh();
+    } catch (error) {
+      setExtendError(error instanceof Error ? error.message : "Could not extend deadline");
+    } finally {
+      setExtendLoading(false);
+    }
+  }
 
   // router.refresh() delivers a new server projection after a successful save
   // or a lock race. Adopt it so the client never guesses a final locked value.
@@ -901,7 +981,14 @@ export function CampaignDetail({
   async function handleSaveOpenAt() {
     if (openAtSaving) return;
     if (openAtDraft.trim() === "") return;
-    const parsed = new Date(openAtDraft);
+    let parsed: Date;
+    try {
+      parsed = timezonePickerEnabled
+        ? toInstant(openAtDraft, campaignTimezone)
+        : new Date(openAtDraft);
+    } catch {
+      parsed = new Date(NaN);
+    }
     if (Number.isNaN(parsed.getTime())) {
       toast({
         title: "Invalid date",
@@ -1751,6 +1838,17 @@ export function CampaignDetail({
                   disabled={openAtSaving}
                   className={responsiveEnabled ? "min-h-11 w-full rounded border border-border bg-background px-2 py-1 text-sm" : "w-full px-2 py-1 text-sm border border-border rounded bg-background"}
                 />
+                {timezonePickerEnabled && openAtDraft && (
+                  formatLocalPreview(openAtDraft, campaignTimezone) ? (
+                    <p className="text-xs text-muted-foreground">
+                      {formatLocalPreview(openAtDraft, campaignTimezone)}
+                    </p>
+                  ) : (
+                    <p role="alert" className="text-xs text-destructive">
+                      That local time does not exist in this timezone because the clock moves forward.
+                    </p>
+                  )
+                )}
                 <div className={responsiveEnabled ? "flex flex-col gap-2 sm:flex-row" : "flex gap-2"}>
                   <button
                     type="button"
@@ -1765,7 +1863,9 @@ export function CampaignDetail({
                     onClick={() => {
                       setOpenAtEditing(false);
                       setOpenAtDraft(
-                        formatDateTimeLocal(new Date(campaign.openAt)),
+                        timezonePickerEnabled
+                          ? fromInstant(campaign.openAt, campaignTimezone)
+                          : formatDateTimeLocal(new Date(campaign.openAt)),
                       );
                     }}
                     disabled={openAtSaving}
@@ -1778,14 +1878,18 @@ export function CampaignDetail({
             ) : (
               <div className={responsiveEnabled ? "mt-1 flex flex-col items-start gap-2 sm:flex-row sm:items-center" : "mt-1 flex items-center gap-2"}>
                 <span className="font-medium text-foreground">
-                  {formatDateTime(campaign.openAt)}
+                  {timezonePickerEnabled
+                    ? formatInZone(campaign.openAt, campaignTimezone)
+                    : formatDateTime(campaign.openAt)}
                 </span>
                 {!isClosed && (
                   <button
                     type="button"
                     onClick={() => {
                       setOpenAtDraft(
-                        formatDateTimeLocal(new Date(campaign.openAt)),
+                        timezonePickerEnabled
+                          ? fromInstant(campaign.openAt, campaignTimezone)
+                          : formatDateTimeLocal(new Date(campaign.openAt)),
                       );
                       setOpenAtEditing(true);
                     }}
@@ -1805,11 +1909,74 @@ export function CampaignDetail({
             </div>
             <div className="mt-1 font-medium text-foreground">
               {campaign.closeAt
-                ? formatDateTime(campaign.closeAt)
+                ? timezonePickerEnabled
+                  ? formatInZone(campaign.closeAt, campaignTimezone)
+                  : formatDateTime(campaign.closeAt)
                 : "Open-ended"}
             </div>
+            {timezonePickerEnabled && (
+              <div className="mt-1 text-xs text-muted-foreground">
+                {campaignTimezone}
+              </div>
+            )}
+            {timezonePickerEnabled && campaign.closeAt && !isClosed && (
+              <button
+                type="button"
+                onClick={() => void openExtendDialog()}
+                className="mt-2 text-xs font-medium text-primary hover:underline"
+              >
+                Extend deadline
+              </button>
+            )}
           </div>
         </div>
+
+        <Dialog open={extendOpen} onOpenChange={setExtendOpen}>
+          <DialogContent className="sm:max-w-lg">
+            <DialogHeader>
+              <DialogTitle>Extend close date</DialogTitle>
+              <DialogDescription>
+                Deadlines can only be moved later in this version. Shortening is intentionally unavailable.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <p className="text-sm text-muted-foreground">
+                Current: <span className="line-through">{campaign.closeAt ? formatInZone(campaign.closeAt, campaignTimezone) : "Open-ended"}</span>
+              </p>
+              <div className="space-y-1.5">
+                <label htmlFor="extend-close-at" className="text-sm font-medium">New close date</label>
+                <input
+                  id="extend-close-at"
+                  type="datetime-local"
+                  value={extendDraft}
+                  onChange={(event) => setExtendDraft(event.target.value)}
+                  className="min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                />
+                {extendDraft && formatLocalPreview(extendDraft, campaignTimezone) && (
+                  <p className="text-xs text-muted-foreground">
+                    {formatLocalPreview(extendDraft, campaignTimezone)}
+                  </p>
+                )}
+              </div>
+              {extendPreview && (
+                <p className="rounded-md bg-muted p-3 text-sm">
+                  Reopen the deadline to the new date; extend {extendPreview.affectedCount} invitation link{extendPreview.affectedCount === 1 ? "" : "s"} that have not been submitted; leave {extendPreview.completedCount} completed response{extendPreview.completedCount === 1 ? "" : "s"} untouched.
+                </p>
+              )}
+              <label className="flex min-h-11 items-center gap-2 text-sm">
+                <input type="checkbox" checked={extendNotify} onChange={(event) => setExtendNotify(event.target.checked)} />
+                Email affected respondents the new deadline
+              </label>
+              {extendError && <p role="alert" className="text-sm text-destructive">{extendError}</p>}
+            </div>
+            <DialogFooter>
+              <button type="button" onClick={() => setExtendOpen(false)} className="min-h-11 rounded-md border px-4 text-sm">Cancel</button>
+              <button type="button" onClick={() => void handleExtendDeadline()} disabled={extendLoading || !extendPreview || !extendDraft} className="min-h-11 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50">
+                {extendLoading ? "Extending…" : "Extend deadline"}
+              </button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Stats row */}
         <div

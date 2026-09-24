@@ -229,7 +229,11 @@ describe("GET /api/organizations/[id]", () => {
 });
 
 describe("PATCH /api/organizations/[id]", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+    delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
+  });
 
   it("404 wrong-coach actor", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(otherCoachActor);
@@ -265,6 +269,56 @@ describe("PATCH /api/organizations/[id]", () => {
       where: { id: "o1" },
       data: { name: "Renamed" },
     });
+  });
+
+  it("persists a valid organization time zone", async () => {
+    process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.organization.findUnique as jest.Mock).mockResolvedValue({
+      id: "o1", ownerCoachId: "coach-1", deletedAt: null,
+    });
+    (db.organization.update as jest.Mock).mockResolvedValue({ id: "o1" });
+    const res = await detailPatch(
+      jsonReq({ timezone: "Australia/Sydney" }, "PATCH") as never,
+      detailParams("o1"),
+    );
+    expect(res.status).toBe(200);
+    expect(db.organization.update).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: { timezone: "Australia/Sydney" },
+    });
+  });
+
+  it("ignores organization time zone writes while the wave is off", async () => {
+    delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+    delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.organization.findUnique as jest.Mock).mockResolvedValue({
+      id: "o1", ownerCoachId: "coach-1", deletedAt: null,
+    });
+    (db.organization.update as jest.Mock).mockResolvedValue({ id: "o1" });
+    const res = await detailPatch(
+      jsonReq({ timezone: "Australia/Sydney" }, "PATCH") as never,
+      detailParams("o1"),
+    );
+    expect(res.status).toBe(200);
+    expect(db.organization.update).toHaveBeenCalledWith({
+      where: { id: "o1" },
+      data: {},
+    });
+  });
+
+  it("rejects an invalid organization time zone", async () => {
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (db.organization.findUnique as jest.Mock).mockResolvedValue({
+      id: "o1", ownerCoachId: "coach-1", deletedAt: null,
+    });
+    const res = await detailPatch(
+      jsonReq({ timezone: "Mars/Olympus" }, "PATCH") as never,
+      detailParams("o1"),
+    );
+    expect(res.status).toBe(400);
+    expect(db.organization.update).not.toHaveBeenCalled();
   });
 });
 

@@ -102,6 +102,14 @@ type AssessmentCampaignSendInvites = {
     };
 };
 
+type AssessmentCampaignDeadlineExtended = {
+    data: {
+        campaignId: string;
+        closeAt: string;
+        invitationIds: string[];
+    };
+};
+
 type AssessmentInvitationRejectionRetry = {
     data: {
         invitationId: string;
@@ -128,6 +136,7 @@ type Events = {
     "workflow/step.trigger": WorkflowStepTrigger;
     "assessment/quick-lead.enqueued": AssessmentQuickLeadEnqueued;
     "assessment/campaign.send-invites": AssessmentCampaignSendInvites;
+    "assessment/campaign.deadline-extended": AssessmentCampaignDeadlineExtended;
     "assessment/invitation.rejection-retry": AssessmentInvitationRejectionRetry;
     "assessment/email-delivery-intent.created": AssessmentEmailDeliveryIntentCreated;
 };

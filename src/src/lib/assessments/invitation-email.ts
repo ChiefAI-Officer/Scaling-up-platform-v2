@@ -12,6 +12,8 @@ import { escapeHtml } from "@/lib/templates/interpolate-content-html";
 import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 import { SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 import { sanitizeEmailHtml } from "@/lib/assessments/email-html-sanitizer";
+import { DEFAULT_TIMEZONE, formatInZone } from "@/lib/time";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 export interface InvitationVars {
   respondent: { firstName: string; lastName: string; email: string };
@@ -21,6 +23,7 @@ export interface InvitationVars {
   coachName: string | null;
   invitationUrl: string;
   closeAt: Date | null;
+  timezone?: string;
   /**
    * Wave P — coach logo for the branded-shell header (Jeff #2.1). Rendered
    * ONLY when the caller opts into chrome:"waveP" AND the URL passes
@@ -56,8 +59,16 @@ export function shouldShowOrgLine(templateAlias: string | null | undefined): boo
   return !ORG_LINE_SUPPRESSED_ALIASES.has(templateAlias);
 }
 
-function formatCloseAt(d: Date): string {
-  return d.toLocaleDateString("en-US", { year: "numeric", month: "long", day: "numeric", timeZone: "UTC" });
+function formatCloseAt(d: Date, timezone: string): string {
+  if (timezonePickerEnabled()) {
+    return formatInZone(d, timezone, "dateTime");
+  }
+  return d.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+    timeZone: "UTC",
+  });
 }
 
 /**
@@ -80,7 +91,9 @@ export function buildTokenValues(vars: InvitationVars): Record<string, string> {
   const template = neutralizeMarkdown((vars.templateName ?? "").trim() || "your assessment");
   const coach = neutralizeMarkdown((vars.coachName ?? "").trim() || "your coach");
   const email = neutralizeMarkdown((vars.respondent.email ?? "").trim());
-  const closeAt = vars.closeAt ? formatCloseAt(vars.closeAt) : "ongoing";
+  const closeAt = vars.closeAt
+    ? formatCloseAt(vars.closeAt, vars.timezone ?? DEFAULT_TIMEZONE)
+    : "ongoing";
   const url = vars.invitationUrl; // server-generated — left untouched (used as href in template links)
   // keys are normalized (lowercase, underscores stripped)
   return {

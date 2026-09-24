@@ -296,6 +296,7 @@ export async function POST(
             name: campaign.name,
             alias: campaign.alias,
             closeAt: campaign.closeAt,
+            timezone: campaign.timezone,
             invitationSubject: campaign.invitationSubject,
             invitationBodyMarkdown: campaign.invitationBodyMarkdown,
             invitationBodyHtml: campaign.invitationBodyHtml,

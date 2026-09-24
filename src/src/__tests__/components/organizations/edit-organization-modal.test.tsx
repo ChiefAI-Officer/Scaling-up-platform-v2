@@ -23,6 +23,7 @@ const ORG = {
   id: "org-1",
   name: "Acme Corp",
   externalId: "acme-ext-001",
+  timezone: "America/New_York",
 };
 
 // ---------------------------------------------------------------------------
@@ -62,6 +63,29 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("EditOrganizationModal", () => {
+  test("shows and saves the organization's default time zone when enabled", async () => {
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, data: ORG }),
+    });
+    renderModal({ timezonePickerEnabled: true });
+
+    fireEvent.click(screen.getByRole("button", { name: /time zone/i }));
+    fireEvent.change(screen.getByRole("combobox", { name: /search time zones/i }), {
+      target: { value: "sydney" },
+    });
+    fireEvent.click(screen.getAllByRole("option", { name: /Sydney/i })[0]);
+    fireEvent.click(screen.getByRole("button", { name: /save/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalled());
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.timezone).toBe("Australia/Sydney");
+  });
+
+  test("keeps the time-zone control absent while the feature flag is off", () => {
+    renderModal({ timezonePickerEnabled: false });
+    expect(screen.queryByRole("button", { name: /time zone/i })).not.toBeInTheDocument();
+  });
   test("responsive in-flight state locks only submit and leaves inputs and cancel available", async () => {
     (global.fetch as jest.Mock).mockReturnValue(new Promise(() => {}));
     renderModal({ responsiveEnabled: true });

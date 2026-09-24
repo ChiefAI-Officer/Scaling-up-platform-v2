@@ -53,6 +53,7 @@ import {
 import type { CustomSlide } from "@/lib/assessments/custom-slides";
 import type { CustomSlidesPanelSection } from "@/components/assessments/CustomSlidesPanel";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 import { isMemberPortalEnabled } from "@/lib/members/flags";
 
 interface PageProps {
@@ -285,6 +286,7 @@ export default async function CampaignDetailPage({ params }: PageProps) {
       legacyOverTimeRespondentIds={legacyOverTimeRespondentIds}
       memberPortalAccessWarning={memberPortalCampaignEnabled}
       memberPortalSendEnabled={memberPortalCampaignEnabled}
+      timezonePickerEnabled={timezonePickerEnabled()}
     />
   );
 }

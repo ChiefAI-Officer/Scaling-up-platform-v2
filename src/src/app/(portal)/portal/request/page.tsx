@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { getCoachBioMissingFields } from "@/lib/validations";
 import { NewWorkshopForm } from "@/app/(dashboard)/workshops/new/page";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 export default async function RequestWorkshopPage() {
     const { coach } = await requireCoach();
@@ -60,7 +61,7 @@ export default async function RequestWorkshopPage() {
 
     return (
         <div className="max-w-3xl mx-auto">
-            <NewWorkshopForm isCoachPortal={true} prefilledCoach={coachWithCerts} responsiveEnabled={mobileResponsiveEnabled} />
+            <NewWorkshopForm isCoachPortal={true} prefilledCoach={coachWithCerts} responsiveEnabled={mobileResponsiveEnabled} timezonePickerEnabled={timezonePickerEnabled()} />
         </div>
     );
 }

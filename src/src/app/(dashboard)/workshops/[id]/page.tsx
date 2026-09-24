@@ -35,6 +35,7 @@ import { AdminNotesEditor } from "@/components/workshops/admin-notes-editor";
 import { formatStepLabel } from "@/lib/workflows/workflow-types";
 import { requireAuth } from "@/lib/auth/authorization";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 function executionStatusVariant(status: string): "success" | "warning" | "destructive" | "secondary" {
   switch (status) {
@@ -371,6 +372,8 @@ export default async function WorkshopDetailPage({
                   venueAddress={workshop.venueAddress}
                   coupons={workshop.coupons}
                   categories={categories}
+                  registrationCount={workshop.registrations.filter((registration) => registration.paymentStatus !== "PENDING").length}
+                  timezonePickerEnabled={timezonePickerEnabled()}
                 />
               )}
             </CardContent>

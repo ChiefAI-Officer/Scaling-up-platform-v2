@@ -6,6 +6,9 @@ import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { formatCurrency } from "@/lib/utils";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { formatInZone, LEGACY_INLINE_WORKSHOP_ZONES } from "@/lib/time";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 
 interface Category {
   id: string;
@@ -37,19 +40,9 @@ interface WorkshopInlineEditFormProps {
   venueAddress: string | null;
   // Data
   categories: Category[];
+  registrationCount?: number;
+  timezonePickerEnabled?: boolean;
 }
-
-const TIMEZONES = [
-  "America/New_York",
-  "America/Chicago",
-  "America/Denver",
-  "America/Los_Angeles",
-  "America/Phoenix",
-  "America/Anchorage",
-  "Pacific/Honolulu",
-  "America/Toronto",
-  "America/Vancouver",
-];
 
 /** Parse venueAddress JSON blob into components, or return empty defaults */
 function parseVenueAddress(raw: string | null): { street: string; city: string; state: string; zip: string } {
@@ -89,6 +82,8 @@ export function WorkshopInlineEditForm({
   venueName,
   venueAddress,
   categories,
+  registrationCount = 0,
+  timezonePickerEnabled = false,
 }: WorkshopInlineEditFormProps) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
@@ -149,6 +144,24 @@ export function WorkshopInlineEditForm({
     venueState: parsedVenue.state,
     venueZip: parsedVenue.zip,
   });
+  const workshopStartPreview = React.useMemo(() => {
+    const start = form.eventTime.split(/\s*-\s*/)[0] || "";
+    if (!form.eventDate || !start) return { instant: null, error: null };
+    try {
+      return {
+        instant: resolveEventStartMoment({
+          eventDate: new Date(`${form.eventDate}T00:00:00.000Z`),
+          eventTime: start,
+          timezone: form.timezone,
+          strict: timezonePickerEnabled,
+        }),
+        error: null,
+      };
+    } catch {
+      return { instant: null, error: "That local time does not exist in this timezone because the clock moves forward." };
+    }
+  }, [form.eventDate, form.eventTime, form.timezone, timezonePickerEnabled]);
+  const resolvedWorkshopStart = workshopStartPreview.instant;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +171,9 @@ export function WorkshopInlineEditForm({
     setStripeWarning(null);
 
     try {
+      if (timezonePickerEnabled && workshopStartPreview.error) {
+        throw new Error(workshopStartPreview.error);
+      }
       const res = await fetch(`/api/workshops/${workshopId}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
@@ -467,16 +483,40 @@ export function WorkshopInlineEditForm({
             </div>
             <div>
               <Label htmlFor="ie-timezone" className="text-xs">Timezone</Label>
-              <select
-                id="ie-timezone"
-                value={form.timezone}
-                onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary bg-background"
-              >
-                {TIMEZONES.map((tz) => (
-                  <option key={tz} value={tz}>{tz}</option>
-                ))}
-              </select>
+              {timezonePickerEnabled ? (
+                <TimezoneSelect
+                  value={form.timezone}
+                  onChange={(nextTimezone) =>
+                    setForm((current) => ({ ...current, timezone: nextTimezone }))
+                  }
+                  at={resolvedWorkshopStart ?? new Date()}
+                  className="mt-1"
+                />
+              ) : (
+                <select
+                  id="ie-timezone"
+                  value={form.timezone}
+                  onChange={(e) => setForm((p) => ({ ...p, timezone: e.target.value }))}
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:ring-primary bg-background"
+                >
+                  {LEGACY_INLINE_WORKSHOP_ZONES.map((zone) => (
+                    <option key={zone} value={zone}>{zone}</option>
+                  ))}
+                </select>
+              )}
+              {timezonePickerEnabled && resolvedWorkshopStart && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatInZone(resolvedWorkshopStart, form.timezone)}
+                </p>
+              )}
+              {timezonePickerEnabled && workshopStartPreview.error && (
+                <p role="alert" className="mt-1 text-xs text-destructive">{workshopStartPreview.error}</p>
+              )}
+              {timezonePickerEnabled && registrationCount > 0 && form.timezone !== (timezone || "America/New_York") && (
+                <p role="alert" className="mt-2 text-xs text-warning">
+                  {registrationCount} registered attendee{registrationCount === 1 ? "" : "s"} will see the updated time zone. Existing emails are not resent automatically.
+                </p>
+              )}
             </div>
             {form.format !== "IN_PERSON" && (
             <div>

@@ -11,6 +11,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { WorkshopRulesPanel } from "@/components/workshops/workshop-rules-panel";
 import { useMobileResponsiveEnabled } from "@/lib/use-mobile-responsive-enabled";
 import { cn } from "@/lib/utils";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { detectZone, formatInZone, LEGACY_NEW_WORKSHOP_ZONE_OPTIONS } from "@/lib/time";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 
 interface Coach {
   id: string;
@@ -96,6 +99,7 @@ interface NewWorkshopFormProps {
   isCoachPortal?: boolean;
   prefilledCoach?: Coach;
   responsiveEnabled?: boolean;
+  timezonePickerEnabled?: boolean;
 }
 
 // MR-21: Multi-coupon entry
@@ -108,7 +112,7 @@ interface CouponEntry {
   singleUse: boolean;
 }
 
-export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, responsiveEnabled = false }: NewWorkshopFormProps) {
+export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, responsiveEnabled = false, timezonePickerEnabled: initialTimezonePickerEnabled }: NewWorkshopFormProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -129,6 +133,9 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, respons
   const [showCustomPricing, setShowCustomPricing] = useState(false);
   // Track whether coach manually edited description (prevents category change from clobbering)
   const descriptionManuallyEdited = useRef(false);
+  const [timezonePickerEnabled, setTimezonePickerEnabled] = useState(
+    initialTimezonePickerEnabled ?? false,
+  );
 
   const [formData, setFormData] = useState({
     coachId: prefilledCoach?.id ?? "",
@@ -142,7 +149,7 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, respons
     eventDate: "",
     eventTime: "",
     eventEndTime: "",
-    timezone: "America/New_York",
+    timezone: initialTimezonePickerEnabled ? detectZone() : "America/New_York",
     venueName: "",
     venueStreet: "",
     venueCity: "",
@@ -159,6 +166,41 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, respons
     customPricingRequest: "",
     customPrice: "",
   });
+
+  useEffect(() => {
+    if (initialTimezonePickerEnabled !== undefined) return;
+    void fetch("/api/features/timezone-picker")
+      .then((response) => response.json())
+      .then((body) => {
+        if (body.enabled === true) {
+          setTimezonePickerEnabled(true);
+          setFormData((current) =>
+            current.timezone === "America/New_York"
+              ? { ...current, timezone: detectZone() }
+              : current,
+          );
+        }
+      })
+      .catch(() => undefined);
+  }, [initialTimezonePickerEnabled]);
+
+  const workshopStartPreview = useMemo(() => {
+    if (!formData.eventDate || !formData.eventTime) return { instant: null, error: null };
+    try {
+      return {
+        instant: resolveEventStartMoment({
+          eventDate: new Date(`${formData.eventDate}T00:00:00.000Z`),
+          eventTime: formData.eventTime,
+          timezone: formData.timezone,
+          strict: timezonePickerEnabled,
+        }),
+        error: null,
+      };
+    } catch {
+      return { instant: null, error: "That local time does not exist in this timezone because the clock moves forward." };
+    }
+  }, [formData.eventDate, formData.eventTime, formData.timezone, timezonePickerEnabled]);
+  const resolvedWorkshopStart = workshopStartPreview.instant;
 
   useEffect(() => {
     async function loadData() {
@@ -383,6 +425,9 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, respons
     setError(null);
 
     try {
+      if (timezonePickerEnabled && workshopStartPreview.error) {
+        throw new Error(workshopStartPreview.error);
+      }
       if (!termsAccepted) {
         throw new Error("You must accept the terms and conditions before creating a workshop.");
       }
@@ -832,20 +877,37 @@ export function NewWorkshopForm({ isCoachPortal = false, prefilledCoach, respons
 
             <div>
               <Label htmlFor="timezone">Timezone</Label>
-              <select
-                id="timezone"
-                name="timezone"
-                value={formData.timezone}
-                onChange={handleChange}
-                className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-background"
-              >
-                <option value="America/New_York">Eastern Time (ET)</option>
-                <option value="America/Chicago">Central Time (CT)</option>
-                <option value="America/Denver">Mountain Time (MT)</option>
-                <option value="America/Los_Angeles">Pacific Time (PT)</option>
-                <option value="America/Phoenix">Arizona (no DST)</option>
-                <option value="Pacific/Honolulu">Hawaii (HT)</option>
-              </select>
+              {timezonePickerEnabled ? (
+                <TimezoneSelect
+                  value={formData.timezone}
+                  onChange={(timezone) =>
+                    setFormData((current) => ({ ...current, timezone }))
+                  }
+                  at={resolvedWorkshopStart ?? new Date()}
+                  helperText="Detected from your browser. Shown on workshop pages, calendar files, and attendee emails."
+                  className="mt-1"
+                />
+              ) : (
+                <select
+                  id="timezone"
+                  name="timezone"
+                  value={formData.timezone}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border border-border px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary bg-background"
+                >
+                  {LEGACY_NEW_WORKSHOP_ZONE_OPTIONS.map(([value, label]) => (
+                    <option key={value} value={value}>{label}</option>
+                  ))}
+                </select>
+              )}
+              {timezonePickerEnabled && resolvedWorkshopStart && (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {formatInZone(resolvedWorkshopStart, formData.timezone)}
+                </p>
+              )}
+              {timezonePickerEnabled && workshopStartPreview.error && (
+                <p role="alert" className="mt-1 text-xs text-destructive">{workshopStartPreview.error}</p>
+              )}
             </div>
 
             {formData.format !== "VIRTUAL" && (

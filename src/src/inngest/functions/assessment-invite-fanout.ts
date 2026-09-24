@@ -106,6 +106,7 @@ interface FanoutCampaignRow {
   name: string;
   alias: string;
   closeAt: Date | null;
+  timezone: string;
   status: string;
   inviteTiming: string;
   deletedAt: Date | null;
@@ -437,6 +438,7 @@ export async function runInviteFanout(
             name: campaign.name,
             alias: campaign.alias,
             closeAt: campaign.closeAt,
+            timezone: campaign.timezone,
             invitationSubject: campaign.invitationSubject,
             invitationBodyMarkdown: campaign.invitationBodyMarkdown,
             invitationBodyHtml: campaign.invitationBodyHtml,

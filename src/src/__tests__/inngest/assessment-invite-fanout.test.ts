@@ -40,6 +40,7 @@ function makeCampaign(
     name: string;
     alias: string;
     closeAt: Date | null;
+    timezone: string;
     status: string;
     inviteTiming: string;
     deletedAt: Date | null;
@@ -53,6 +54,7 @@ function makeCampaign(
     name: overrides.name ?? "Q3 Team Assessment",
     alias: overrides.alias ?? "q3-team",
     closeAt: overrides.closeAt ?? null,
+    timezone: overrides.timezone ?? "Australia/Sydney",
     status: overrides.status ?? "ACTIVE",
     inviteTiming: overrides.inviteTiming ?? "IMMEDIATELY",
     deletedAt: overrides.deletedAt ?? null,
@@ -346,6 +348,8 @@ describe("runInviteFanout", () => {
     expect(batchDeps.db).toBe(deps.db);
     expect(batchDeps.sendEmail).toBe(deps.sendEmail);
     expect(typeof batchDeps.now).toBe("function");
+    const [, batchInput] = deps.sendInvitesBatch.mock.calls[0];
+    expect(batchInput.campaign.timezone).toBe("Australia/Sydney");
   });
 
   it("passes enabled stable-link context and adapters using the exact campaign alias", async () => {

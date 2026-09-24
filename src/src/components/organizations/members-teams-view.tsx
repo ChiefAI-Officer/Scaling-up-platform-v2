@@ -44,6 +44,7 @@ export interface OrgSummary {
    */
   ownerCoachName?: string | null;
   externalId: string | null;
+  timezone?: string;
 }
 
 /** Shape returned by GET /api/organizations/[id]/teams (nested tree) */
@@ -115,6 +116,8 @@ export interface MembersTeamsViewProps {
   memberPortalEnabled?: boolean;
   /** Enables the explicit Coach-facing led-team authority surfaces. */
   memberLedTeamsEnabled?: boolean;
+  /** Enables the shared IANA time-zone picker on organization settings. */
+  timezonePickerEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -218,6 +221,7 @@ export function MembersTeamsView({
   responsiveEnabled = false,
   memberPortalEnabled = false,
   memberLedTeamsEnabled = false,
+  timezonePickerEnabled = false,
 }: MembersTeamsViewProps) {
   // Companies list — may grow when a new Company is created via the modal
   const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
@@ -630,6 +634,7 @@ export function MembersTeamsView({
                         id: org.id,
                         name: org.name,
                         externalId: org.externalId,
+                        timezone: org.timezone,
                       });
                     }}
                     className={[
@@ -1224,11 +1229,11 @@ export function MembersTeamsView({
             const res = await fetch(`/api/organizations/${editedId}`);
             const json = await res.json();
             if (res.ok && json.success && json.data) {
-              const updated = json.data as { id: string; name: string; externalId: string | null };
+              const updated = json.data as { id: string; name: string; externalId: string | null; timezone: string };
               setOrganizations((prev) =>
                 prev.map((o) =>
                   o.id === updated.id
-                    ? { ...o, name: updated.name, externalId: updated.externalId }
+                    ? { ...o, name: updated.name, externalId: updated.externalId, timezone: updated.timezone }
                     : o
                 )
               );
@@ -1236,6 +1241,7 @@ export function MembersTeamsView({
           }}
           organization={orgBeingEdited}
           responsiveEnabled={responsiveEnabled}
+          timezonePickerEnabled={timezonePickerEnabled}
         />
       )}
     </>

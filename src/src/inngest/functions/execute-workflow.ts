@@ -32,6 +32,8 @@ import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-mom
 import { orderStepsForExecution } from "@/lib/workflows/order-steps-for-execution";
 import { buildLocationString } from "@/lib/ics-generator";
 import { formatTimeWithZone, formatZoneAbbrev } from "@/lib/utils";
+import { formatInZone } from "@/lib/time";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 import {
   buildProtectedEmailAttachments,
   canDeliverWorkflowAttachments,
@@ -117,18 +119,21 @@ export const executeWorkflow = inngest.createFunction(
       eventTime: workshop.eventTime,
       timezone: workshop.timezone,
     });
+    const workshopTimezone = workshop.timezone || "UTC";
 
     // Build context for variable interpolation
     const baseContext: WorkflowContext = {
       workshopTitle: workshop.title,
       workshopCode: workshop.workshopCode,
-      workshopDate: eventDate.toLocaleDateString("en-US", {
-        weekday: "long",
-        year: "numeric",
-        month: "long",
-        day: "numeric",
-        timeZone: "UTC",
-      }),
+      workshopDate: timezonePickerEnabled()
+        ? formatInZone(eventDate, workshopTimezone, "date")
+        : eventDate.toLocaleDateString("en-US", {
+          weekday: "long",
+          year: "numeric",
+          month: "long",
+          day: "numeric",
+          timeZone: "UTC",
+        }),
       // Carry the DST-aware zone abbreviation (e.g. "9:00 AM EDT"). Anchor on the
       // RAW stored workshop.eventDate (midnight UTC of the event day), NOT the
       // resolved start-moment above — formatZoneAbbrev derives the correct DST

@@ -10,6 +10,9 @@ import { sendWorkshopRequestedEmail } from "@/services/notifications";
 import { parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { createWorkshopPromotionCode } from "@/services/stripe";
 import { resolveCoachProfessionalTitle } from "@/lib/coaches/coach-profile-fields";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
+import { isValidZone } from "@/lib/time";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 
 function normalizeOptionalString(value: unknown): string | undefined {
   if (typeof value !== "string") {
@@ -136,6 +139,27 @@ export async function POST(request: NextRequest) {
     }
 
     const data = validation.data;
+    if (timezonePickerEnabled() && !isValidZone(data.timezone)) {
+      return NextResponse.json(
+        { success: false, error: "Select a valid IANA timezone." },
+        { status: 400 },
+      );
+    }
+    if (timezonePickerEnabled() && data.eventTime) {
+      try {
+        resolveEventStartMoment({
+          eventDate: data.eventDate,
+          eventTime: data.eventTime,
+          timezone: data.timezone,
+          strict: true,
+        });
+      } catch {
+        return NextResponse.json(
+          { success: false, error: "That local time does not exist in the selected timezone." },
+          { status: 400 },
+        );
+      }
+    }
     const isDuoWorkshop = body.isDuoWorkshop === true || body.isDuoWorkshop === "true";
     const secondaryCoachId = normalizeOptionalString(body.secondaryCoachId);
     const eventEndTime = normalizeOptionalString(body.eventEndTime);

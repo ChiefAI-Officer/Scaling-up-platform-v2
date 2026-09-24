@@ -14,6 +14,7 @@ import {
   quickAssessmentLeadEmailCron,
 } from "@/inngest/functions/quick-assessment-lead-email";
 import { assessmentInviteFanout } from "@/inngest/functions/assessment-invite-fanout";
+import { assessmentDeadlineExtendedNotifications } from "@/inngest/functions/assessment-deadline-extended-notifications";
 import { assessmentScheduledSendCron } from "@/inngest/functions/assessment-scheduled-send-cron";
 import { espertoImportAlertCron } from "@/inngest/functions/esperto-import-alert-cron";
 import {
@@ -40,6 +41,7 @@ export const { GET, POST, PUT } = serve({
         quickAssessmentLeadEmail,
         quickAssessmentLeadEmailCron,
         assessmentInviteFanout,
+        assessmentDeadlineExtendedNotifications,
         assessmentScheduledSendCron,
         espertoImportAlertCron,
         assessmentEmailIntentReconciliation,

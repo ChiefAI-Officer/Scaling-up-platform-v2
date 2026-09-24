@@ -76,6 +76,7 @@ export interface CampaignOverview {
     status: "DRAFT" | "ACTIVE" | "CLOSED";
     openAt: Date;
     closeAt: Date | null;
+    timezone?: string;
     createdAt: Date;
     templateId: string;
     templateName: string;
@@ -246,6 +247,7 @@ interface CampaignWithRels {
   status: "DRAFT" | "ACTIVE" | "CLOSED";
   openAt: Date;
   closeAt: Date | null;
+  timezone?: string;
   createdAt: Date;
   invitationSubject: string | null;
   invitationBodyMarkdown: string | null;
@@ -481,6 +483,7 @@ export async function getCampaignOverview(
       status: campaign.status,
       openAt: campaign.openAt,
       closeAt: campaign.closeAt,
+      timezone: campaign.timezone,
       createdAt: campaign.createdAt,
       templateId: campaign.template.id,
       templateName: campaign.template.name,

@@ -3,6 +3,9 @@
 import { useState, useEffect } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { formatInZone, LEGACY_RESUBMIT_ZONE_OPTIONS } from "@/lib/time";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 
 // CHG-01 (May 4 2026): the "denied" variant + /api/workshops/[id]/resubmit route
 // were removed. Coaches re-submit a fresh workshop request via /portal/request,
@@ -39,6 +42,8 @@ export interface ResubmitWorkshopProps {
   priceCents?: number | null;
   isFree?: boolean;
   pricingTierId?: string | null;
+  registrationCount?: number;
+  timezonePickerEnabled?: boolean;
 }
 
 export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
@@ -59,6 +64,8 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
     priceCents: initialPriceCents = null,
     isFree: initialIsFree = false,
     pricingTierId: initialPricingTierId = null,
+    registrationCount = 0,
+    timezonePickerEnabled = false,
   } = props;
 
   const [submitting, setSubmitting] = useState(false);
@@ -76,6 +83,23 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
   const [venueName, setVenueName] = useState(initialVenueName || "");
   const [venueAddress, setVenueAddress] = useState(initialVenueAddress || "");
   const [virtualLink, setVirtualLink] = useState(initialVirtualLink || "");
+  const workshopStartPreview = (() => {
+    if (!/^\d{1,2}:\d{2}/.test(eventTime)) return { instant: null, error: null };
+    try {
+      return {
+        instant: resolveEventStartMoment({
+          eventDate: new Date(`${eventDate}T00:00:00.000Z`),
+          eventTime,
+          timezone,
+          strict: timezonePickerEnabled,
+        }),
+        error: null,
+      };
+    } catch {
+      return { instant: null, error: "That local time does not exist in this timezone because the clock moves forward." };
+    }
+  })();
+  const resolvedWorkshopStart = workshopStartPreview.instant;
 
   const [pricingTierId, setPricingTierId] = useState(initialPricingTierId || "");
   const [customPricingNotes, setCustomPricingNotes] = useState("");
@@ -105,6 +129,9 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
     setFeedback(null);
 
     try {
+      if (timezonePickerEnabled && workshopStartPreview.error) {
+        throw new Error(workshopStartPreview.error);
+      }
       const hasPricingChange = Boolean(
         pricingTierId && pricingTierId !== (initialPricingTierId || "")
       );
@@ -285,21 +312,36 @@ export function ResubmitWorkshop(props: ResubmitWorkshopProps) {
 
         <div>
           <label className="block text-sm font-medium text-foreground mb-1">Timezone</label>
-          <select
-            value={timezone}
-            onChange={(e) => setTimezone(e.target.value)}
-            className="w-full px-3 py-2 border rounded-lg text-sm bg-background focus:ring-2 focus:ring-primary focus:border-primary"
-          >
-            <option value="America/New_York">Eastern (ET)</option>
-            <option value="America/Chicago">Central (CT)</option>
-            <option value="America/Denver">Mountain (MT)</option>
-            <option value="America/Los_Angeles">Pacific (PT)</option>
-            <option value="America/Anchorage">Alaska (AKT)</option>
-            <option value="Pacific/Honolulu">Hawaii (HT)</option>
-            <option value="Europe/London">London (GMT/BST)</option>
-            <option value="Europe/Paris">Central Europe (CET)</option>
-            <option value="Australia/Sydney">Sydney (AEDT)</option>
-          </select>
+          {timezonePickerEnabled ? (
+            <TimezoneSelect
+              value={timezone}
+              onChange={setTimezone}
+              at={resolvedWorkshopStart ?? new Date()}
+            />
+          ) : (
+            <select
+              value={timezone}
+              onChange={(e) => setTimezone(e.target.value)}
+              className="w-full px-3 py-2 border rounded-lg text-sm bg-background focus:ring-2 focus:ring-primary focus:border-primary"
+            >
+              {LEGACY_RESUBMIT_ZONE_OPTIONS.map(([value, label]) => (
+                <option key={value} value={value}>{label}</option>
+              ))}
+            </select>
+          )}
+          {timezonePickerEnabled && resolvedWorkshopStart && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {formatInZone(resolvedWorkshopStart, timezone)}
+            </p>
+          )}
+          {timezonePickerEnabled && workshopStartPreview.error && (
+            <p role="alert" className="mt-1 text-xs text-destructive">{workshopStartPreview.error}</p>
+          )}
+          {timezonePickerEnabled && registrationCount > 0 && timezone !== (initialTimezone || "America/New_York") && (
+            <p role="alert" className="mt-2 text-xs text-warning">
+              {registrationCount} registered attendee{registrationCount === 1 ? "" : "s"} will see the updated time zone. Existing emails are not resent automatically.
+            </p>
+          )}
         </div>
 
         {format !== "VIRTUAL" && (

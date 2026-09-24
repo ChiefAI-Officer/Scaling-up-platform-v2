@@ -51,6 +51,7 @@ import {
 import { Prisma } from "@prisma/client";
 import { isInvitationBannerEnabled } from "@/lib/assessments/wave-invitation-banner-flags";
 import { isPublicCampaignLifecycleEnabled } from "@/lib/assessments/wave-public-campaign-lifecycle-flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 const PublicCampaignDeleteQuerySchema = z.object({
   expectedStatus: z.enum(["DRAFT", "CLOSED"]).optional(),
@@ -412,6 +413,7 @@ export async function PATCH(
       select: {
         id: true,
         status: true,
+        closeAt: true,
         accessMode: true,
         organizationId: true,
         templateId: true,
@@ -460,6 +462,35 @@ export async function PATCH(
       );
     }
     const data = validation.data;
+
+    // Timezone wave: every deadline extension must use the dedicated endpoint,
+    // which updates the campaign and all unsubmitted invitation/token expiry
+    // metadata atomically. Leaving this legacy write lane open would let API
+    // clients change closeAt without preserving redeemability.
+    if (timezonePickerEnabled() && data.closeAt !== undefined) {
+      const requestedCloseAt = data.closeAt === null ? null : new Date(data.closeAt);
+      if (
+        requestedCloseAt === null ||
+        campaign.closeAt === null ||
+        Number.isNaN(requestedCloseAt.getTime()) ||
+        requestedCloseAt.getTime() <= campaign.closeAt.getTime()
+      ) {
+        return NextResponse.json(
+          {
+            success: false,
+            error: "The new close date must be later than the current close date",
+          },
+          { status: 409 },
+        );
+      }
+      return NextResponse.json(
+        {
+          success: false,
+          error: "Use the deadline extension endpoint to change closeAt",
+        },
+        { status: 400 },
+      );
+    }
 
     const updateData: {
       name?: string;

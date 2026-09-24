@@ -45,6 +45,7 @@ import { SU_LOGO_PNG, SU_LOGO_CID } from "@/lib/assets/invitation-logo";
 import { resolveInvitationHtmlMode } from "@/lib/assessments/invitation-html-policy";
 import { safeImageSrc } from "@/lib/assessments/safe-image-src";
 import { resolveAdminAlertRecipients } from "@/lib/notifications/admin-alert-recipients";
+import { formatInZone } from "@/lib/time";
 
 // ============================================
 // Types
@@ -1206,7 +1207,7 @@ export async function sendCoachDeclinedCounterEmail(data: {
 export interface AssessmentInvitationEmailInput {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
-    campaign: { id: string; name: string; alias: string; closeAt: Date | null };
+    campaign: { id: string; name: string; alias: string; closeAt: Date | null; timezone?: string };
     template: { alias: string; invitationSubject: string; invitationBodyMarkdown: string };
     /**
      * Per-campaign custom-HTML invitation override (#20). When non-empty and
@@ -1243,6 +1244,26 @@ export async function sendAssessmentInvitationEmail(
 ): Promise<void> {
     const prepared = prepareAssessmentInvitationEmail(data);
     await prepared.send();
+}
+
+export async function sendCampaignDeadlineExtendedEmail(data: {
+    to: string;
+    firstName: string;
+    campaignName: string;
+    closeAt: Date;
+    timezone: string;
+}): Promise<void> {
+    const closeLabel = formatInZone(data.closeAt, data.timezone);
+    await sendEmailViaSMTP({
+        to: data.to,
+        subject: `Deadline extended: ${data.campaignName}`,
+        html: `<div style="font-family:'Segoe UI',Tahoma,Geneva,Verdana,sans-serif;max-width:560px;margin:0 auto;"><p>Hi ${escapeHtml(data.firstName || "there")},</p><p>The deadline for <strong>${escapeHtml(data.campaignName)}</strong> has been extended.</p><p><strong>New deadline:</strong> ${escapeHtml(closeLabel)}</p><p>Your existing assessment link remains valid.</p></div>`,
+        text: `Hi ${data.firstName || "there"},\n\nThe deadline for ${data.campaignName} has been extended.\n\nNew deadline: ${closeLabel}\n\nYour existing assessment link remains valid.`,
+        telemetry: {
+            recipientRole: "CUSTOM",
+            metadata: { type: "assessment_deadline_extended" },
+        },
+    });
 }
 
 export function prepareAssessmentInvitationEmail(
@@ -1324,6 +1345,7 @@ export function prepareAssessmentInvitationEmail(
         coachName: legacyCoachName,
         invitationUrl,
         closeAt: data.campaign.closeAt,
+        timezone: data.campaign.timezone,
         coachLogoUrl: legacyCoachLogoUrl,
         // Jeff #61 — omit the header org/company line for templates that lead
         // with the coach (LVA). Alias is passed by every send path; an absent
@@ -1441,7 +1463,7 @@ export function prepareAssessmentInvitationEmail(
 function buildLegacyInvitationEmailOptions(data: {
     invitation: { id: string; expiresAt: Date };
     respondent: { id: string; firstName: string; lastName: string; email: string };
-    campaign: { id: string; name: string; alias: string; closeAt: Date | null };
+    campaign: { id: string; name: string; alias: string; closeAt: Date | null; timezone?: string };
     organizationName: string | null;
     templateName: string | null;
     coachName: string | null;
@@ -1468,6 +1490,7 @@ function buildLegacyInvitationEmailOptions(data: {
         coachName: data.coachName,
         invitationUrl: data.invitationUrl,
         closeAt: data.campaign.closeAt,
+        timezone: data.campaign.timezone,
     };
 
     // Subject through the shared SUBJECT_ALLOW path: allowlist + control-char /
