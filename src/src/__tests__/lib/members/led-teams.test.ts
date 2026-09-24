@@ -8,6 +8,12 @@ function databaseFixture(options?: {
   roleType?: string | null;
   respondentOrganizationId?: string;
   teams?: Array<{ id: string; organizationId: string }>;
+  existingAssignments?: Array<{
+    teamId: string;
+    source: string;
+    createdBy: string;
+    team?: { name: string };
+  }>;
 }) {
   const respondentOrganizationId = options?.respondentOrganizationId ?? "org-a";
   const deletes: unknown[] = [];
@@ -30,6 +36,7 @@ function databaseFixture(options?: {
       ),
     },
     orgRespondentLedTeam: {
+      findMany: jest.fn().mockResolvedValue(options?.existingAssignments ?? []),
       deleteMany: jest.fn(async (args) => {
         deletes.push(args);
         return { count: 1 };
@@ -131,5 +138,117 @@ describe("replaceMemberLedTeams", () => {
     );
     expect(tx.orgRespondentLedTeam.deleteMany).not.toHaveBeenCalled();
     expect(tx.orgRespondentLedTeam.createMany).not.toHaveBeenCalled();
+  });
+
+  it("preserves inferred provenance for retained edges until the coach confirms them", async () => {
+    const { db, creates } = databaseFixture({
+      existingAssignments: [
+        {
+          teamId: "sales",
+          source: "backfill-0040",
+          createdBy: "SYSTEM",
+          team: { name: "Sales" },
+        },
+      ],
+    });
+
+    await replaceMemberLedTeams(db, {
+      respondentId: "member-1",
+      teamIds: ["sales", "engineering"],
+      createdBy: "coach-user-1",
+      source: "coach",
+      preserveExistingSources: true,
+    });
+
+    expect(creates[0]).toEqual({
+      data: [
+        {
+          respondentId: "member-1",
+          teamId: "sales",
+          organizationId: "org-a",
+          createdBy: "SYSTEM",
+          source: "backfill-0040",
+        },
+        {
+          respondentId: "member-1",
+          teamId: "engineering",
+          organizationId: "org-a",
+          createdBy: "coach-user-1",
+          source: "coach",
+        },
+      ],
+    });
+  });
+
+  it("changes only an explicitly confirmed inferred edge to coach provenance", async () => {
+    const { db, creates } = databaseFixture({
+      existingAssignments: [
+        {
+          teamId: "sales",
+          source: "backfill-0040",
+          createdBy: "SYSTEM",
+          team: { name: "Sales" },
+        },
+        {
+          teamId: "engineering",
+          source: "backfill-0040",
+          createdBy: "SYSTEM",
+          team: { name: "Engineering" },
+        },
+      ],
+    });
+
+    await replaceMemberLedTeams(db, {
+      respondentId: "member-1",
+      teamIds: ["sales", "engineering"],
+      confirmTeamIds: ["sales"],
+      createdBy: "coach-user-1",
+      source: "coach",
+      preserveExistingSources: true,
+    });
+
+    expect(creates[0]).toEqual({
+      data: [
+        expect.objectContaining({
+          teamId: "sales",
+          source: "coach",
+          createdBy: "coach-user-1",
+        }),
+        expect.objectContaining({
+          teamId: "engineering",
+          source: "backfill-0040",
+          createdBy: "SYSTEM",
+        }),
+      ],
+    });
+  });
+
+  it("rejects confirmation for an edge that was not inferred", async () => {
+    const { db, tx } = databaseFixture({
+      existingAssignments: [
+        {
+          teamId: "sales",
+          source: "csv",
+          createdBy: "import-operator",
+          team: { name: "Sales" },
+        },
+      ],
+    });
+
+    await expect(
+      replaceMemberLedTeams(db, {
+        respondentId: "member-1",
+        teamIds: ["sales"],
+        confirmTeamIds: ["sales"],
+        createdBy: "coach-user-1",
+        source: "coach",
+        preserveExistingSources: true,
+      }),
+    ).rejects.toEqual(
+      expect.objectContaining<MemberLedTeamWriteError>({
+        code: "confirmation-not-inferred",
+      }),
+    );
+    expect(tx.orgRespondentLedTeam.deleteMany).not.toHaveBeenCalled();
   });
 });

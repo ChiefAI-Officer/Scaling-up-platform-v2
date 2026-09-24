@@ -15,11 +15,10 @@
 import React, { useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { ChevronLeft, ChevronRight, ChevronDown, Building2, Users, UserPlus, Upload, FolderPlus, Pencil, FileDown } from "lucide-react";
-import { levelLabel } from "@/lib/assessments/respondent-levels";
+import { isCEOFamily, levelLabel } from "@/lib/assessments/respondent-levels";
 import { AddTeamModal } from "./add-team-modal";
 import type { CreatedResult } from "./add-team-modal";
 import { AddMemberModal } from "./add-member-modal";
-import type { MemberCreatedResult } from "./add-member-modal";
 import { EditTeamModal, excludeTeamSubtree } from "./edit-team-modal";
 import type { EditTeamModalTeam } from "./edit-team-modal";
 import { EditMemberModal } from "./edit-member-modal";
@@ -27,6 +26,7 @@ import type { EditMemberModalMember } from "./edit-member-modal";
 import { EditOrganizationModal } from "./edit-organization-modal";
 import type { EditOrganizationModalOrg } from "./edit-organization-modal";
 import { ImportMembersModal } from "./import-members-modal";
+import type { AuthorityMember, MemberLedTeamView } from "./member-leads-field";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -67,6 +67,7 @@ export interface ApiRespondent {
   email: string;
   roleType: string | null;
   jobTitle?: string | null;
+  ledTeams?: MemberLedTeamView[];
 }
 
 /**
@@ -112,6 +113,8 @@ export interface MembersTeamsViewProps {
   responsiveEnabled?: boolean;
   /** Enables member-portal report-access guidance in member editors. */
   memberPortalEnabled?: boolean;
+  /** Enables the explicit Coach-facing led-team authority surfaces. */
+  memberLedTeamsEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -214,6 +217,7 @@ export function MembersTeamsView({
   allowGroupByCoach = false,
   responsiveEnabled = false,
   memberPortalEnabled = false,
+  memberLedTeamsEnabled = false,
 }: MembersTeamsViewProps) {
   // Companies list — may grow when a new Company is created via the modal
   const [organizations, setOrganizations] = useState<OrgSummary[]>(initialOrganizations);
@@ -258,6 +262,7 @@ export function MembersTeamsView({
   const [members, setMembers] = useState<ApiRespondent[]>([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
   const [membersError, setMembersError] = useState(false);
+  const [authorityMembersByOrg, setAuthorityMembersByOrg] = useState<Record<string, AuthorityMember[]>>({});
 
   // Sequence counters for request-ordering guards (prevent stale responses overwriting newer ones)
   const memberSeqRef = useRef(0);
@@ -335,6 +340,13 @@ export function MembersTeamsView({
         return;
       }
       let data = json.data as ApiRespondent[];
+      const memberOrgId = node.kind === "organization" ? node.id : node.orgId;
+      if (memberLedTeamsEnabled && Array.isArray(json.authorityMembers)) {
+        setAuthorityMembersByOrg((current) => ({
+          ...current,
+          [memberOrgId]: json.authorityMembers as AuthorityMember[],
+        }));
+      }
       // For the unassigned bucket, filter to only unteamed respondents
       if (node.kind === "unassigned") {
         data = data.filter((r) => r.teamId === null);
@@ -349,7 +361,7 @@ export function MembersTeamsView({
         setLoadingMembers(false);
       }
     }
-  }, []);
+  }, [memberLedTeamsEnabled]);
 
   // --------------------------------------------------------------------------
   // Handlers
@@ -437,7 +449,7 @@ export function MembersTeamsView({
 
   // AddMemberModal callback — refresh the right panel after create
   const handleMemberCreated = useCallback(
-    async (_result: MemberCreatedResult) => {
+    async () => {
       if (selectedNode) {
         await loadMembers(selectedNode);
       }
@@ -924,6 +936,9 @@ export function MembersTeamsView({
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Name</th>
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Email</th>
                   <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Level</th>
+                  {memberLedTeamsEnabled && (
+                    <th className="px-6 py-2.5 text-left font-medium text-muted-foreground">Leads</th>
+                  )}
                   <th className="px-3 py-2.5 text-left font-medium text-muted-foreground w-12"></th>
                 </tr>
               </thead>
@@ -934,16 +949,6 @@ export function MembersTeamsView({
                     selectedNode!.kind === "organization" ? selectedNode!.id :
                     selectedNode!.kind === "team"         ? selectedNode!.orgId :
                     /* unassigned */                        selectedNode!.orgId;
-
-                  // Flatten the org's loaded teams for the Team selector in the edit modal
-                  function flattenForModal(nodes: ApiTeamNode[]): ApiTeamNode[] {
-                    const result: ApiTeamNode[] = [];
-                    for (const n of nodes) {
-                      result.push(n);
-                      result.push(...flattenForModal(n.children));
-                    }
-                    return result;
-                  }
 
                   return (
                     <tr
@@ -981,6 +986,38 @@ export function MembersTeamsView({
                         )}
                         {levelLabel(m.roleType)}
                       </td>
+                      {memberLedTeamsEnabled && (
+                        <td className={responsiveEnabled
+                          ? "block py-1 text-muted-foreground sm:table-cell sm:px-6 sm:py-3"
+                          : "px-6 py-3 text-muted-foreground"}
+                        >
+                          {responsiveEnabled && (
+                            <span className="mr-2 text-xs font-medium uppercase tracking-wide text-muted-foreground sm:hidden">
+                              Leads
+                            </span>
+                          )}
+                          {isCEOFamily(m.roleType) ? (
+                            <span className="inline-flex rounded-full border border-primary/30 px-2 py-0.5 text-xs font-medium text-primary">
+                              org-wide
+                            </span>
+                          ) : (m.ledTeams?.length ?? 0) > 0 ? (
+                            <span className="flex flex-wrap gap-1">
+                              {m.ledTeams!.map((edge) => (
+                                <span
+                                  key={edge.teamId}
+                                  className={edge.source === "backfill-0040"
+                                    ? "inline-flex rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800 dark:bg-amber-950/30 dark:text-amber-300"
+                                    : "inline-flex rounded-full border border-border px-2 py-0.5 text-xs font-medium text-foreground"}
+                                >
+                                  {edge.teamName}{edge.source === "backfill-0040" ? " · inferred" : ""}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span aria-label="Leads no teams">—</span>
+                          )}
+                        </td>
+                      )}
                       <td className={responsiveEnabled
                         ? "block py-1 text-left sm:table-cell sm:px-3 sm:py-3 sm:text-right"
                         : "px-3 py-3 text-right"}
@@ -1001,6 +1038,7 @@ export function MembersTeamsView({
                               jobTitle: m.jobTitle ?? null,
                               teamId: m.teamId ?? null,
                               roleType: m.roleType ?? null,
+                              ledTeams: m.ledTeams ?? [],
                             });
                             // Lazy-load teams if not yet fetched
                             if (
@@ -1107,6 +1145,8 @@ export function MembersTeamsView({
             loadingTeams={orgStates[modalOrgId]?.loadingTeams ?? false}
             responsiveEnabled={responsiveEnabled}
             memberPortalEnabled={memberPortalEnabled}
+            memberLedTeamsEnabled={memberLedTeamsEnabled}
+            organizationMembers={authorityMembersByOrg[modalOrgId] ?? []}
           />
         );
       })()}
@@ -1165,6 +1205,8 @@ export function MembersTeamsView({
             teams={editMemberTeams}
             responsiveEnabled={responsiveEnabled}
             memberPortalEnabled={memberPortalEnabled}
+            memberLedTeamsEnabled={memberLedTeamsEnabled}
+            organizationMembers={authorityMembersByOrg[memberBeingEdited.orgId] ?? []}
           />
         );
       })()}

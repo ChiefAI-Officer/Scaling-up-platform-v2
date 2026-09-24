@@ -11,6 +11,7 @@ import {
   replaceMemberLedTeams,
   type MemberLedTeamsDb,
 } from "../src/lib/members/led-teams";
+import { saveCoachMemberLedTeams } from "../src/lib/members/coach-led-teams";
 
 const destructiveOptIn =
   process.env.ASSESSMENT_EMAIL_LEASE_TEST_ALLOW === "isolated-schema";
@@ -113,6 +114,12 @@ describe("member Led teams on PostgreSQL", () => {
   });
 
   afterEach(async () => {
+    await db.auditLog.deleteMany({
+      where: {
+        entityType: "OrgRespondentLedTeam",
+        entityId: { contains: suffix },
+      },
+    });
     await db.orgRespondentLedTeam.deleteMany({
       where: { organizationId: { in: [ids.orgA, ids.orgB] } },
     });
@@ -120,6 +127,12 @@ describe("member Led teams on PostgreSQL", () => {
 
   afterAll(async () => {
     if (!db) return;
+    await db.auditLog.deleteMany({
+      where: {
+        entityType: "OrgRespondentLedTeam",
+        entityId: { contains: suffix },
+      },
+    });
     await db.orgRespondentLedTeam.deleteMany({
       where: { organizationId: { in: [ids.orgA, ids.orgB] } },
     });
@@ -329,5 +342,91 @@ describe("member Led teams on PostgreSQL", () => {
       ]),
     );
     expect(danaScope).not.toContain(ids.foreignMember);
+  });
+
+  it("audits grants, inferred confirmation, and revocation without changing confirmation scope", async () => {
+    await db.orgRespondentLedTeam.create({
+      data: {
+        respondentId: ids.sam,
+        teamId: ids.sales,
+        organizationId: ids.orgA,
+        createdBy: "SYSTEM",
+        source: "backfill-0040",
+      },
+    });
+
+    const reader = createMemberEntitlementReader(db);
+    const scope = () =>
+      scopeForAuthorityMode(
+        {
+          respondentId: ids.sam,
+          organizationId: ids.orgA,
+          teamId: ids.sales,
+          roleType: "teamleader",
+        },
+        reader,
+        "led-teams",
+      );
+
+    const beforeConfirm = await scope();
+    await saveCoachMemberLedTeams(db, {
+      organizationId: ids.orgA,
+      respondentId: ids.sam,
+      teamIds: [ids.sales],
+      confirmTeamIds: [ids.sales],
+      actorId: ids.coach,
+      performedBy: memberEmail("coach"),
+    });
+    const afterConfirm = await scope();
+    expect(afterConfirm).toEqual(beforeConfirm);
+
+    await saveCoachMemberLedTeams(db, {
+      organizationId: ids.orgA,
+      respondentId: ids.sam,
+      teamIds: [ids.sales, ids.engineering],
+      actorId: ids.coach,
+      performedBy: memberEmail("coach"),
+    });
+    await saveCoachMemberLedTeams(db, {
+      organizationId: ids.orgA,
+      respondentId: ids.sam,
+      teamIds: [ids.engineering],
+      actorId: ids.coach,
+      performedBy: memberEmail("coach"),
+    });
+
+    const edge = await db.orgRespondentLedTeam.findUniqueOrThrow({
+      where: {
+        respondentId_teamId: {
+          respondentId: ids.sam,
+          teamId: ids.engineering,
+        },
+      },
+    });
+    expect(edge).toEqual(
+      expect.objectContaining({ source: "coach", createdBy: ids.coach }),
+    );
+
+    const audits = await db.auditLog.findMany({
+      where: {
+        entityType: "OrgRespondentLedTeam",
+        entityId: { contains: suffix },
+      },
+      orderBy: { timestamp: "asc" },
+    });
+    expect(audits.map((audit) => audit.action)).toEqual(["UPDATE", "CREATE", "DELETE"]);
+    expect(
+      audits.map((audit) => {
+        const changes = JSON.parse(audit.changes) as {
+          direction: string;
+          resultingScopeSize: number;
+        };
+        return [changes.direction, changes.resultingScopeSize];
+      }),
+    ).toEqual([
+      ["CONFIRM", beforeConfirm.size],
+      ["GRANT", 5],
+      ["REVOKE", 3],
+    ]);
   });
 });

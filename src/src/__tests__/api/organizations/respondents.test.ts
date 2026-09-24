@@ -13,8 +13,8 @@ jest.mock("next/server", () => ({
   },
 }));
 
-jest.mock("@/lib/db", () => ({
-  db: {
+jest.mock("@/lib/db", () => {
+  const mockDb: Record<string, unknown> = {
     orgRespondent: {
       findMany: jest.fn(),
       findFirst: jest.fn(),
@@ -28,8 +28,10 @@ jest.mock("@/lib/db", () => ({
     auditLog: {
       create: jest.fn().mockResolvedValue(undefined),
     },
-  },
-}));
+  };
+  mockDb.$transaction = jest.fn(async (run: (tx: unknown) => Promise<unknown>) => run(mockDb));
+  return { db: mockDb };
+});
 
 jest.mock("@/lib/auth/authorization", () => ({
   getApiActor: jest.fn(),
@@ -46,6 +48,19 @@ jest.mock("@/lib/assessments/access-control", () => ({
   asAccessDb: (x: unknown) => x,
 }));
 
+jest.mock("@/lib/members/flags", () => ({
+  isMemberLedTeamsEnabled: jest.fn().mockReturnValue(false),
+}));
+
+jest.mock("@/lib/members/coach-led-teams", () => ({
+  saveCoachMemberLedTeamsInTransaction: jest.fn().mockResolvedValue({
+    respondentId: "r1",
+    organizationId: "o1",
+    assignments: [],
+    scopeSize: 1,
+  }),
+}));
+
 import {
   GET as listGet,
   POST as listPost,
@@ -57,6 +72,9 @@ import {
 import { db } from "@/lib/db";
 import { getApiActor } from "@/lib/auth/authorization";
 import { canAccessOrganization } from "@/lib/assessments/access-control";
+import { isMemberLedTeamsEnabled } from "@/lib/members/flags";
+import { saveCoachMemberLedTeamsInTransaction } from "@/lib/members/coach-led-teams";
+import { MemberLedTeamWriteError } from "@/lib/members/led-teams";
 
 const coachActor = {
   userId: "u1",
@@ -86,7 +104,10 @@ function jsonReq(body: unknown, method: string = "POST"): Request {
 }
 
 describe("GET /api/organizations/[id]/respondents", () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (isMemberLedTeamsEnabled as jest.Mock).mockReturnValue(false);
+  });
 
   it("401 when unauthenticated", async () => {
     (getApiActor as jest.Mock).mockResolvedValue(null);
@@ -129,6 +150,52 @@ describe("GET /api/organizations/[id]/respondents", () => {
         where: { organizationId: "o1", deletedAt: null, teamId: "team-7" },
       })
     );
+  });
+
+  it("includes led-team provenance and organization authority context only while R3 is enabled", async () => {
+    (isMemberLedTeamsEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findMany as jest.Mock)
+      .mockResolvedValueOnce([
+        {
+          id: "r1",
+          organizationId: "o1",
+          teamId: "exec",
+          roleType: "teamleader",
+          ledTeams: [
+            {
+              teamId: "sales",
+              source: "backfill-0040",
+              createdBy: "SYSTEM",
+              createdAt: new Date("2026-09-23T00:00:00.000Z"),
+              team: { name: "Sales" },
+            },
+          ],
+        },
+      ])
+      .mockResolvedValueOnce([
+        {
+          id: "r1",
+          teamId: "exec",
+          roleType: "teamleader",
+          firstName: "Alex",
+          lastName: "Rivera",
+        },
+      ]);
+
+    const response = await listGet(
+      listReq("http://localhost/api/organizations/o1/respondents?teamId=exec") as never,
+      listParams("o1"),
+    );
+    const body = await response.json();
+
+    expect(body.data[0].ledTeams[0]).toEqual(
+      expect.objectContaining({ teamId: "sales", teamName: "Sales", source: "backfill-0040" }),
+    );
+    expect(body.authorityMembers).toEqual([
+      expect.objectContaining({ id: "r1", teamId: "exec", roleType: "teamleader" }),
+    ]);
   });
 });
 
@@ -370,6 +437,43 @@ describe("POST /api/organizations/[id]/respondents", () => {
           roleType: null,
         }),
       })
+    );
+  });
+
+  it("creates a leadership member and their led teams in one transaction", async () => {
+    (isMemberLedTeamsEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.create as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      email: "leader@example.com",
+      roleType: "teamleader",
+      dedupeSource: "email",
+      dedupeValue: "leader@example.com",
+    });
+
+    const response = await listPost(
+      jsonReq({
+        email: "leader@example.com",
+        firstName: "Taylor",
+        lastName: "Morgan",
+        roleType: "teamleader",
+        ledTeamIds: ["sales", "marketing"],
+      }) as never,
+      listParams("o1"),
+    );
+
+    expect(response.status).toBe(201);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(saveCoachMemberLedTeamsInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        organizationId: "o1",
+        respondentId: "r1",
+        teamIds: ["sales", "marketing"],
+        actorId: "u1",
+      }),
     );
   });
 });
@@ -632,6 +736,94 @@ describe("PATCH /api/organizations/[id]/respondents/[respondentId]", () => {
 
     expect(res.status).toBe(400);
     expect(db.orgRespondent.update).not.toHaveBeenCalled();
+  });
+
+  it("updates member fields and led teams atomically when ledTeamIds is supplied", async () => {
+    (isMemberLedTeamsEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "email",
+      dedupeValue: "leader@example.com",
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      roleType: "teamleader",
+    });
+
+    const response = await detailPatch(
+      jsonReq(
+        { firstName: "Updated", roleType: "teamleader", ledTeamIds: ["sales"] },
+        "PATCH",
+      ) as never,
+      detailParams("o1", "r1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(db.$transaction).toHaveBeenCalledTimes(1);
+    expect(saveCoachMemberLedTeamsInTransaction).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ respondentId: "r1", teamIds: ["sales"] }),
+    );
+  });
+
+  it("leaves led teams unchanged when Team changes without ledTeamIds", async () => {
+    (isMemberLedTeamsEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "email",
+      dedupeValue: "leader@example.com",
+    });
+    (db.orgTeam.findUnique as jest.Mock).mockResolvedValue({
+      id: "marketing",
+      organizationId: "o1",
+      deletedAt: null,
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({ id: "r1", teamId: "marketing" });
+
+    const response = await detailPatch(
+      jsonReq({ teamId: "marketing" }, "PATCH") as never,
+      detailParams("o1", "r1"),
+    );
+
+    expect(response.status).toBe(200);
+    expect(saveCoachMemberLedTeamsInTransaction).not.toHaveBeenCalled();
+  });
+
+  it("returns a validation response when a stale led-team selection is rejected", async () => {
+    (isMemberLedTeamsEnabled as jest.Mock).mockReturnValue(true);
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    (canAccessOrganization as jest.Mock).mockResolvedValue(true);
+    (db.orgRespondent.findUnique as jest.Mock).mockResolvedValue({
+      id: "r1",
+      organizationId: "o1",
+      deletedAt: null,
+      dedupeSource: "email",
+      dedupeValue: "leader@example.com",
+    });
+    (db.orgRespondent.update as jest.Mock).mockResolvedValue({ id: "r1" });
+    (saveCoachMemberLedTeamsInTransaction as jest.Mock).mockRejectedValue(
+      new MemberLedTeamWriteError("team-not-found"),
+    );
+
+    const response = await detailPatch(
+      jsonReq({ ledTeamIds: ["deleted-team"] }, "PATCH") as never,
+      detailParams("o1", "r1"),
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({
+      success: false,
+      error: "team-not-found",
+    });
   });
 });
 

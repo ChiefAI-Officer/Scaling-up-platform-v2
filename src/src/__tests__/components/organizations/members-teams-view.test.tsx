@@ -562,6 +562,41 @@ describe("MembersTeamsView", () => {
     expect(memberRow).toHaveTextContent("—");
   });
 
+  test("R3 adds a Leads column with inferred provenance and an explicit empty state", async () => {
+    mockFetchForOrg1Teams();
+    (global.fetch as jest.Mock).mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: [
+          {
+            ...RESPONDENT_ALICE,
+            roleType: "teamleader",
+            ledTeams: [
+              {
+                teamId: "team-eng",
+                teamName: "Engineering",
+                source: "backfill-0040",
+                createdBy: "SYSTEM",
+                createdAt: "2026-09-23T00:00:00.000Z",
+              },
+            ],
+          },
+          { ...RESPONDENT_BOB, ledTeams: [] },
+        ],
+        authorityMembers: [],
+      }),
+    });
+    render(<MembersTeamsView initialOrganizations={[ORG_1]} memberLedTeamsEnabled />);
+
+    fireEvent.click(screen.getByRole("button", { name: /^Acme Corp$/i }));
+
+    expect(await screen.findByRole("columnheader", { name: "Leads" })).toBeInTheDocument();
+    expect(screen.getByText(/Engineering · inferred/i)).toBeInTheDocument();
+    const bobRow = screen.getByTestId(`member-row-${RESPONDENT_BOB.id}`);
+    expect(within(bobRow).getByLabelText("Leads no teams")).toHaveTextContent("—");
+  });
+
   /**
    * (k) Clicking "Import members" with a node selected opens ImportMembersModal.
    */

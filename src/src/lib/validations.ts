@@ -528,6 +528,7 @@ export const createRespondentSchema = z.object({
     teamId: z.string().min(1).nullable().optional(),
     externalId: z.string().min(1).max(200).transform(_trim).nullable().optional(),
     roleType: z.enum(RESPONDENT_LEVEL_VALUES).optional().nullable(),
+    ledTeamIds: z.array(z.string().min(1)).max(100).optional(),
 });
 
 export const updateRespondentSchema = z.object({
@@ -540,6 +541,7 @@ export const updateRespondentSchema = z.object({
     jobTitle: z.string().max(200).transform(_trim).nullable().optional(),
     teamId: z.string().min(1).nullable().optional(),
     roleType: z.enum(RESPONDENT_LEVEL_VALUES).optional().nullable(),
+    ledTeamIds: z.array(z.string().min(1)).max(100).optional(),
 });
 
 // ---------------------------------------------------------------------

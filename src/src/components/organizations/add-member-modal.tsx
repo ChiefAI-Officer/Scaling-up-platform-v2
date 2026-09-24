@@ -35,6 +35,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
 import { RESPONDENT_LEVELS } from "@/lib/assessments/respondent-levels";
+import {
+  MemberLeadsField,
+  type AuthorityMember,
+} from "./member-leads-field";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -79,6 +83,10 @@ export interface AddMemberModalProps {
   responsiveEnabled?: boolean;
   /** Shows report-access guidance. Resolve this server-side from the member-portal flag. */
   memberPortalEnabled?: boolean;
+  /** Enables the explicit led-team authority authoring surface. */
+  memberLedTeamsEnabled?: boolean;
+  /** All live members in the organization, used for access previews and peer warnings. */
+  organizationMembers?: AuthorityMember[];
 }
 
 type FieldError = { id: string; message: string };
@@ -107,6 +115,8 @@ export function AddMemberModal({
   description,
   responsiveEnabled = false,
   memberPortalEnabled = false,
+  memberLedTeamsEnabled = false,
+  organizationMembers = [],
 }: AddMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -122,6 +132,7 @@ export function AddMemberModal({
   const [jobTitle,  setJobTitle]  = useState("");
   const [teamId,    setTeamId]    = useState<string>(defaultTeamId ?? "");
   const [roleType,  setRoleType]  = useState<string>("");
+  const [ledTeamIds, setLedTeamIds] = useState<string[]>([]);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -137,6 +148,7 @@ export function AddMemberModal({
       setJobTitle("");
       setTeamId(defaultTeamId ?? "");
       setRoleType("");
+      setLedTeamIds([]);
       setError(null);
       setFieldErrors([]);
     }
@@ -196,6 +208,9 @@ export function AddMemberModal({
       // Send roleType only when a level is actually selected
       if (roleType) {
         body.roleType = roleType;
+      }
+      if (memberLedTeamsEnabled) {
+        body.ledTeamIds = roleType === "teamleader" ? ledTeamIds : [];
       }
 
       const res = await fetch(`/api/organizations/${orgId}/respondents`, {
@@ -392,7 +407,7 @@ export function AddMemberModal({
                   </>
                 )}
               </select>
-              {memberPortalEnabled && roleType === "teamleader" && !teamId && (
+              {memberPortalEnabled && !memberLedTeamsEnabled && roleType === "teamleader" && !teamId && (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   Leadership team member needs a team to grant additional report access.
                 </p>
@@ -422,6 +437,19 @@ export function AddMemberModal({
                 ))}
               </select>
             </div>
+
+            {memberLedTeamsEnabled && (
+              <MemberLeadsField
+                roleType={roleType}
+                memberFirstName={firstName.trim()}
+                teams={teams}
+                organizationMembers={organizationMembers}
+                selectedTeamIds={ledTeamIds}
+                assignments={[]}
+                onChange={setLedTeamIds}
+                disabled={submitting}
+              />
+            )}
 
             {/* ---- Inline error ---- */}
             {!responsiveEnabled && error && (

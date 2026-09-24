@@ -1,8 +1,7 @@
 # Scaling Up Platform v2 - Development Instructions
 
 > **IMPORTANT: Keep this file current.** After completing any sprint, feature, or schema change,
-> update the relevant sections below. This is the single source of truth for AI assistants
-> working on this codebase.
+> update the relevant sections below; this is the source of truth.
 
 ## Project Context
 
@@ -18,7 +17,7 @@ the full workshop lifecycle from request through post-event follow-up.
 | **Client** | Jeff Verdun, CIO - Scaling Up |
 | **Operations** | Suzanne (handles manual approvals) |
 | **Integrated main history** | Recent launch receipts: `plans/CHANGELOG.md`. |
-| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-09-23 LAST_UPDATED_SLUG:member-led-teams-authority-activated --> September 23 — **Member led-team authority is enabled and production-verified; R3 Coach correction UI remains next.** |
+| **Last Updated** | <!-- LAST_UPDATED_ISO:2026-09-24 LAST_UPDATED_SLUG:member-led-teams-coach-ui-implemented --> September 24 — **R3 Coach Leads UI verified locally; release pending.** |
 | **Jeff #48 validation** | Pre-launch validation passed 15/15 focused suites and 224/224 tests plus the production-context real-component harness/editor Preview coverage. Live production verification was read-only: the invited QSP route returned `200` with `qspStoryGroupEnabled=true`; no valid token was opened, no assessment was submitted, no authenticated editor session was used, and no PUBLIC QSP campaign exists. |
 | **Latest progress** | The [July 10 ledger](docs/agents/jul10-feedback-closeout.md) records 50 DONE, 0 PARTIAL, and 3 NEEDS DECISION. Only #33, #41, and #45 remain; each requires content or report-specific intent before implementation. The [August 1–7 delta](docs/agents/jul10-progress-delta-2026-08-01-to-2026-08-07.md) remains 12 outcomes because later acceptances began after August 7. |
 | **Work Logs** | Session work logs at `~/.claude/worklogs/` — invoke `/log-session` to log or generate reports |
@@ -246,6 +245,7 @@ src/
 | `/api/assessments/referred-results` | GET | Coach-owned public submissions with scoped pagination/search | Coach |
 | `/api/assessments/referred-results/[submissionId]` | DELETE | Coach-owned collection soft removal | Coach |
 | `/api/assessment-campaigns/[id]/member-links` | POST | Send Member sign-in links | Campaign Coach/Admin/Staff |
+| `/api/organizations/[id]/respondents/[respondentId]/led-teams` | GET, PUT | Read/replace led-team report authority | Organization Coach |
 | `/api/admin/public-campaigns/[id]/submissions` | GET | Public campaign submissions with result/report oversight | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents` | GET | Paginated HELD assessment-email recovery intents with masked identity | Admin/Staff |
 | `/api/admin/assessment-email-delivery-intents/[id]` | GET | Audited frozen-payload and authorization-drift review detail | Admin/Staff |
