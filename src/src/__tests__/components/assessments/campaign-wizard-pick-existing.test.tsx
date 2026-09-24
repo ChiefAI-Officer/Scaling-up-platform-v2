@@ -25,7 +25,12 @@ jest.mock("@/components/ui/use-toast", () => ({
 // Fixtures
 // ---------------------------------------------------------------------------
 
-const ORG = { id: "org-1", name: "Acme Corp", externalId: null };
+const ORG = {
+  id: "org-1",
+  name: "Acme Corp",
+  externalId: null,
+  timezone: "America/New_York",
+};
 const TEMPLATE = {
   id: "tpl-1",
   name: "Rockefeller Habits",
@@ -396,6 +401,40 @@ describe("CampaignWizard — pick-existing flow", () => {
     const partBody = partCall.body as Record<string, unknown>;
     expect(partBody.respondentIds).toEqual(["resp-1"]);
     expect(partBody.ceoRespondentId).toBe("resp-1");
+  });
+
+  it("defaults to the organization zone and converts schedule wall time to UTC", async () => {
+    installFetch({
+      orgs: [{ ...ORG, timezone: "Australia/Sydney" }],
+    });
+    render(<CampaignWizard timezonePickerEnabled />);
+    await advanceToParticipants();
+
+    fireEvent.click(await screen.findByRole("checkbox", { name: /alice smith/i }));
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+
+    expect(await screen.findByRole("button", { name: /time zone/i })).toHaveTextContent(
+      /Sydney/,
+    );
+    fireEvent.change(screen.getByLabelText(/campaign name/i), {
+      target: { value: "Sydney Campaign" },
+    });
+    fireEvent.change(screen.getByLabelText(/opens at/i), {
+      target: { value: "2026-10-16T17:00" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /next/i }));
+    fireEvent.click(await screen.findByRole("button", { name: /save as draft/i }));
+
+    await waitFor(() =>
+      expect(
+        findCall((c) => c.url.endsWith("/api/assessment-campaigns") && c.method === "POST"),
+      ).toBeTruthy(),
+    );
+    const body = findCall(
+      (c) => c.url.endsWith("/api/assessment-campaigns") && c.method === "POST",
+    )!.body as Record<string, unknown>;
+    expect(body.timezone).toBe("Australia/Sydney");
+    expect(body.openAt).toBe("2026-10-16T06:00:00.000Z");
   });
 });
 

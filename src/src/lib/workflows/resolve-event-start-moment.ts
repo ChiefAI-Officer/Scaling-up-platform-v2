@@ -11,10 +11,14 @@
  * (UTC) so downstream code can offset against it correctly.
  */
 
+import { toInstant } from "@/lib/time";
+
 export interface WorkshopStartMomentInput {
   eventDate: Date;
   eventTime?: string | null;
   timezone?: string | null;
+  /** Reject nonexistent DST wall times. Defaults false for legacy/background compatibility. */
+  strict?: boolean;
 }
 
 export function resolveEventStartMoment(workshop: WorkshopStartMomentInput): Date {
@@ -29,7 +33,13 @@ export function resolveEventStartMoment(workshop: WorkshopStartMomentInput): Dat
 
   const tz = workshop.timezone || "UTC";
 
-  return zonedWallClockToUtc(year, month, day, hour, minute, tz);
+  const localValue =
+    `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day
+      .toString()
+      .padStart(2, "0")}T${hour.toString().padStart(2, "0")}:${minute
+      .toString()
+      .padStart(2, "0")}`;
+  return toInstant(localValue, tz, { normalizeNonexistent: !workshop.strict });
 }
 
 function parseStartTime(raw: string | null | undefined): { hour: number; minute: number } | null {
@@ -80,51 +90,13 @@ export function setWallClockInTimezone(
   const month = parseInt(parts.month, 10);
   const day = parseInt(parts.day, 10);
 
-  return zonedWallClockToUtc(year, month, day, hour, minute, timezone);
-}
-
-/**
- * Given a wall-clock moment (year/month/day/hour/minute) in a specific IANA
- * timezone, return the corresponding UTC Date. Handles DST transitions via
- * Intl.DateTimeFormat (the platform's tzdata).
- */
-function zonedWallClockToUtc(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  minute: number,
-  timezone: string
-): Date {
-  // First guess: treat the wall-clock as UTC.
-  const guessUtc = Date.UTC(year, month - 1, day, hour, minute);
-
-  // Ask Intl what wall-clock that UTC moment shows in the target timezone.
-  const fmt = new Intl.DateTimeFormat("en-US", {
-    timeZone: timezone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-    hour12: false,
-  });
-  const parts = Object.fromEntries(
-    fmt.formatToParts(new Date(guessUtc)).map((p) => [p.type, p.value])
+  return toInstant(
+    `${year.toString().padStart(4, "0")}-${month.toString().padStart(2, "0")}-${day
+      .toString()
+      .padStart(2, "0")}T${hour.toString().padStart(2, "0")}:${minute
+      .toString()
+      .padStart(2, "0")}`,
+    timezone,
+    { normalizeNonexistent: true },
   );
-
-  const tzYear = parseInt(parts.year, 10);
-  const tzMonth = parseInt(parts.month, 10);
-  const tzDay = parseInt(parts.day, 10);
-  // Intl sometimes emits "24" for midnight; normalize.
-  const tzHour = parseInt(parts.hour, 10) % 24;
-  const tzMinute = parseInt(parts.minute, 10);
-
-  const tzAsUtc = Date.UTC(tzYear, tzMonth - 1, tzDay, tzHour, tzMinute);
-
-  // The difference is the timezone's offset for that moment.
-  // Adjusting the guess by the offset lands at the true UTC for the wall-clock.
-  const offset = guessUtc - tzAsUtc;
-  return new Date(guessUtc + offset);
 }

@@ -436,6 +436,7 @@ export async function POST(
               name: campaign.name,
               alias: campaign.alias,
               closeAt: campaign.closeAt,
+              timezone: campaign.timezone,
             },
             template: {
               alias: campaign.template.alias,
@@ -790,6 +791,7 @@ export async function POST(
             name: campaign.name,
             alias: campaign.alias,
             closeAt: campaign.closeAt,
+            timezone: campaign.timezone,
           },
           template: {
             alias: campaign.template.alias,

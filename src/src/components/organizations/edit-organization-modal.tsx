@@ -35,6 +35,8 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
+import { DEFAULT_TIMEZONE } from "@/lib/time";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -44,6 +46,7 @@ export interface EditOrganizationModalOrg {
   id: string;
   name: string;
   externalId?: string | null;
+  timezone?: string;
 }
 
 export interface EditOrganizationModalProps {
@@ -58,6 +61,7 @@ export interface EditOrganizationModalProps {
   /** The organization being edited. */
   organization: EditOrganizationModalOrg;
   responsiveEnabled?: boolean;
+  timezonePickerEnabled?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +74,7 @@ export function EditOrganizationModal({
   onUpdated,
   organization,
   responsiveEnabled = false,
+  timezonePickerEnabled = false,
 }: EditOrganizationModalProps) {
   const nameId     = useId();
   const extIdId    = useId();
@@ -77,6 +82,7 @@ export function EditOrganizationModal({
   // Form state — pre-filled from organization prop
   const [name,       setName]       = useState(organization.name);
   const [externalId, setExternalId] = useState(organization.externalId ?? "");
+  const [timezone, setTimezone] = useState(organization.timezone ?? DEFAULT_TIMEZONE);
 
   // Submission state
   const [submitting, setSubmitting] = useState(false);
@@ -87,9 +93,10 @@ export function EditOrganizationModal({
     if (open) {
       setName(organization.name);
       setExternalId(organization.externalId ?? "");
+      setTimezone(organization.timezone ?? DEFAULT_TIMEZONE);
       setError(null);
     }
-  }, [open, organization.id, organization.name, organization.externalId]);
+  }, [open, organization.id, organization.name, organization.externalId, organization.timezone]);
 
   // ---------------------------------------------------------------------------
   // Validation + submit
@@ -118,6 +125,7 @@ export function EditOrganizationModal({
         // We send null explicitly when cleared so the API coerces correctly.
         externalId: externalId.trim() ? externalId.trim() : null,
       };
+      if (timezonePickerEnabled) body.timezone = timezone;
 
       const res = await fetch(`/api/organizations/${organization.id}`, {
         method: "PATCH",
@@ -198,6 +206,18 @@ export function EditOrganizationModal({
                 Optional reference id for syncing with an external system.
               </p>
             </div>
+
+            {timezonePickerEnabled && (
+              <div className="space-y-1.5">
+                <Label>Default time zone</Label>
+                <TimezoneSelect
+                  value={timezone}
+                  onChange={setTimezone}
+                  disabled={submitting}
+                  helperText="Used as the default for new campaigns for this organization."
+                />
+              </div>
+            )}
 
             {/* ---- Inline error ---- */}
             {error && (

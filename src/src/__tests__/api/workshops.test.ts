@@ -118,6 +118,53 @@ describe("Workshops API", () => {
   });
 
   describe("POST /api/workshops", () => {
+    it("rejects an invalid timezone even when no event time is supplied", async () => {
+      process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      const payload: Partial<ReturnType<typeof buildWorkshopPayload>> =
+        buildWorkshopPayload("2026-03-08T00:00:00.000Z");
+      delete payload.eventTime;
+      const response = await POST(asPostRequest(new Request("http://localhost/api/workshops", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ...payload, timezone: "Mars/Olympus" }),
+      })));
+      delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: expect.stringMatching(/valid IANA timezone/i) });
+      expect(db.workshop.create).not.toHaveBeenCalled();
+    });
+
+    it("rejects a nonexistent DST wall time at the server boundary when enabled", async () => {
+      process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+      (getApiActor as jest.Mock).mockResolvedValue({
+        userId: "admin-1",
+        email: "admin@example.com",
+        role: "ADMIN",
+        coachId: null,
+      });
+      const response = await POST(
+        asPostRequest(new Request("http://localhost/api/workshops", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            ...buildWorkshopPayload("2026-03-08T00:00:00.000Z"),
+            eventTime: "02:30",
+          }),
+        })),
+      );
+      delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+      expect(response.status).toBe(400);
+      expect(await response.json()).toMatchObject({ error: expect.stringMatching(/does not exist/i) });
+      expect(db.workshop.create).not.toHaveBeenCalled();
+    });
+
     it("blocks coaches from using POST /api/workshops (admin-only endpoint)", async () => {
       // POST /api/workshops is admin-only; coaches use /api/approvals instead.
       // The 403 fires before any lead-time logic runs.

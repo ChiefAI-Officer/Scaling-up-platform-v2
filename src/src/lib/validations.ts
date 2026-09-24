@@ -7,6 +7,7 @@ import { z } from "zod";
 import { RESPONDENT_LEVEL_VALUES } from "./assessments/respondent-levels";
 import { safeImageSrc } from "./assessments/safe-image-src";
 import { REPORT_STYLE_KEYS } from "./assessments/report-style-registry";
+import { isValidZone } from "./time";
 
 // ============================================================
 // Common Schemas
@@ -504,6 +505,7 @@ export const updateOrganizationSchema = z.object({
         .transform(_trim)
         .nullable()
         .optional(),
+    timezone: z.string().refine(isValidZone, "Invalid time zone").optional(),
 });
 
 export const createTeamSchema = z.object({
@@ -553,6 +555,7 @@ export const createAssessmentCampaignSchema = z
         name: z.string().min(1, "Campaign name is required").max(200).transform(_trim),
         templateId: z.string().min(1, "templateId is required"),
         organizationId: z.string().min(1, "organizationId is required"),
+        timezone: z.string().refine(isValidZone, "Invalid time zone").optional(),
         // Required on every path EXCEPT a Wave-D IMMEDIATELY create (which
         // opens NOW and ignores any client openAt — see the superRefine below
         // and the route's `immediateOpen` branch). Legacy + ON_OPEN creates

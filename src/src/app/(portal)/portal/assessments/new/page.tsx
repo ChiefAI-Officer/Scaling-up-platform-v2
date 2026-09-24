@@ -28,6 +28,7 @@ import { getInvitationBannerAuthoringGate } from "@/lib/assessments/wave-invitat
 import { campaignPickerTemplateWhere } from "@/lib/assessments/campaign-picker-template-scope";
 import { isMobileResponsiveEnabled } from "@/lib/mobile-responsive-flags";
 import { isMemberPortalEnabled } from "@/lib/members/flags";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 export default async function NewCampaignPage() {
   const { session, coach } = await requireCoach();
@@ -99,6 +100,7 @@ export default async function NewCampaignPage() {
         onScreenResultsEnabled={onScreenResultsEnabled}
         adminOwnedPresentation={adminOwnedPresentation}
         memberPortalEnabled={isMemberPortalEnabled()}
+        timezonePickerEnabled={timezonePickerEnabled()}
       />
     </div>
   );

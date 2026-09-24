@@ -91,6 +91,7 @@ export async function POST(
             name: true,
             alias: true,
             closeAt: true,
+            timezone: true,
             status: true,
             externalId: true,
             organizationId: true,
@@ -218,6 +219,7 @@ export async function POST(
           name: c.name,
           alias: c.alias,
           closeAt: c.closeAt,
+          timezone: c.timezone,
         },
         template: {
           alias: c.template.alias,

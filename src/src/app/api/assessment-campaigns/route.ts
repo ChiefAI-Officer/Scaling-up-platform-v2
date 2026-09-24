@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { createAssessmentCampaignSchema } from "@/lib/validations";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 import { getApiActor, isPrivilegedRole } from "@/lib/auth/authorization";
 import {
   asAccessDb,
@@ -374,7 +375,7 @@ export async function POST(request: NextRequest) {
 
     const org = await db.organization.findUnique({
       where: { id: data.organizationId },
-      select: { id: true, name: true },
+      select: { id: true, name: true, timezone: true },
     });
     if (!org) {
       return NextResponse.json(
@@ -519,6 +520,7 @@ export async function POST(request: NextRequest) {
     // the fields to locals here.
     const createdByUserId = actor.userId;
     const createdByCoachId = actor.coachId;
+    const organizationTimezone = org.timezone;
     // Bound for use inside the create-tx audit closures (TS control-flow
     // narrowing of `actor` does not flow into nested function declarations).
     const performedByEmail = actor.email;
@@ -541,6 +543,9 @@ export async function POST(request: NextRequest) {
         openAt: openAtDate,
         endMode: data.endMode,
         closeAt: closeAtDate,
+        ...(timezonePickerEnabled()
+          ? { timezone: data.timezone ?? organizationTimezone }
+          : {}),
         invitationSubject: data.invitationSubject ?? null,
         invitationBodyMarkdown: data.invitationBodyMarkdown ?? null,
         invitationBodyHtml: invitationBodyHtmlToStore,

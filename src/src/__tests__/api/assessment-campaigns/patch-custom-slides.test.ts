@@ -85,6 +85,8 @@ function detailParams(id: string) {
 
 const SLIDE_FLAG = "WAVE_M_CUSTOM_SLIDES_ENABLED";
 const ORIGINAL_FLAG = process.env[SLIDE_FLAG];
+const ORIGINAL_TZ_FLAG = process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+const ORIGINAL_TZ_KILL = process.env.WAVE_TZ_ZONE_PICKER_KILL;
 
 function startSlide(overrides: Record<string, unknown> = {}) {
   return {
@@ -111,6 +113,7 @@ function mockCampaign(opts: {
     status: opts.status ?? "DRAFT",
     versionId: "ver-1",
     customSlides: opts.customSlides ?? null,
+    closeAt: new Date("2026-10-01T16:00:00.000Z"),
   };
   (db.assessmentCampaign.findUnique as jest.Mock).mockResolvedValue(row);
   return row;
@@ -118,6 +121,8 @@ function mockCampaign(opts: {
 
 beforeEach(() => {
   jest.clearAllMocks();
+  delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+  delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     { accessGroupId: "g1", coachId: "coach-1", accessGroup: { id: "g1", deletedAt: null } },
   ]);
@@ -145,6 +150,43 @@ beforeEach(() => {
 afterAll(() => {
   if (ORIGINAL_FLAG === undefined) delete process.env[SLIDE_FLAG];
   else process.env[SLIDE_FLAG] = ORIGINAL_FLAG;
+  if (ORIGINAL_TZ_FLAG === undefined) delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+  else process.env.WAVE_TZ_ZONE_PICKER_ENABLED = ORIGINAL_TZ_FLAG;
+  if (ORIGINAL_TZ_KILL === undefined) delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
+  else process.env.WAVE_TZ_ZONE_PICKER_KILL = ORIGINAL_TZ_KILL;
+});
+
+describe("PATCH closeAt — timezone wave", () => {
+  beforeEach(() => {
+    process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+    mockCampaign({ status: "ACTIVE" });
+  });
+
+  it("rejects shortening through the legacy generic PATCH", async () => {
+    const res = await PATCH(
+      patchReq({ closeAt: "2026-09-30T16:00:00.000Z" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(res.status).toBe(409);
+    expect(await res.json()).toEqual(expect.objectContaining({
+      error: expect.stringMatching(/later than the current close date/i),
+    }));
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
+
+  it("routes valid extensions away from the non-atomic generic PATCH", async () => {
+    const res = await PATCH(
+      patchReq({ closeAt: "2026-10-02T16:00:00.000Z" }) as never,
+      detailParams("c1"),
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual(expect.objectContaining({
+      error: expect.stringMatching(/deadline extension endpoint/i),
+    }));
+    expect(db.assessmentCampaign.update).not.toHaveBeenCalled();
+  });
 });
 
 describe("PATCH customSlides — flag OFF", () => {

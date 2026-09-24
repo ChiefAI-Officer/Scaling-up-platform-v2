@@ -88,6 +88,8 @@ beforeEach(() => {
   delete process.env.WAVE_ED10_PREVIEW_SETTINGS_KILL;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_ENABLED;
   delete process.env.WAVE_ADMIN_OWNED_ASSESSMENT_PRESENTATION_KILL;
+  delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+  delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
   // Default access-group state: coach in 1 group that grants the template.
   (db.accessGroupCoach.findMany as jest.Mock).mockResolvedValue([
     {
@@ -108,6 +110,7 @@ beforeEach(() => {
     ownerCoachId: "coach-1",
     deletedAt: null,
     name: "Acme",
+    timezone: "America/New_York",
   });
   (db.assessmentTemplate.findUnique as jest.Mock).mockResolvedValue({
     id: "tpl-1",
@@ -410,6 +413,30 @@ describe("POST /api/assessment-campaigns", () => {
           versionId: "ver-1",
           language: "enUS",
         }),
+      }),
+    );
+  });
+
+  it("persists the selected time zone when the picker wave is enabled", async () => {
+    process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const res = await POST(jsonReq({ ...validBody, timezone: "Australia/Sydney" }) as never);
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ timezone: "Australia/Sydney" }),
+      }),
+    );
+  });
+
+  it("uses the organization's default zone when the enabled client omits one", async () => {
+    process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+    (getApiActor as jest.Mock).mockResolvedValue(coachActor);
+    const res = await POST(jsonReq(validBody) as never);
+    expect(res.status).toBe(201);
+    expect(db.assessmentCampaign.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ timezone: "America/New_York" }),
       }),
     );
   });

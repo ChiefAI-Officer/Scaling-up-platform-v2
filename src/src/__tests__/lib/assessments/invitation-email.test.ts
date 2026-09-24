@@ -12,6 +12,7 @@ const baseVars: InvitationVars = {
   coachName: "Pat Coach",
   invitationUrl: "https://app.test/org-survey/abc#t=SECRET",
   closeAt: new Date("2026-07-01T00:00:00Z"),
+  timezone: "America/New_York",
 };
 
 describe("interpolateTokens — aliases + conventions", () => {
@@ -34,6 +35,28 @@ describe("interpolateTokens — aliases + conventions", () => {
 
   it("resolves templateName", () => {
     expect(interpolateTokens("{{templateName}}", values())).toBe("Five Dysfunctions");
+  });
+
+  it("renders closeAt in the campaign time zone and names the zone", () => {
+    process.env.WAVE_TZ_ZONE_PICKER_ENABLED = "1";
+    const values = buildTokenValues({
+      ...baseVars,
+      closeAt: new Date("2026-10-16T06:00:00.000Z"),
+      timezone: "Australia/Sydney",
+    });
+    expect(values.closeat).toBe("Friday 16 October 2026, 5:00 PM AEDT");
+    delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+  });
+
+  it("preserves the legacy UTC date-only closeAt bytes while the wave is off", () => {
+    delete process.env.WAVE_TZ_ZONE_PICKER_ENABLED;
+    delete process.env.WAVE_TZ_ZONE_PICKER_KILL;
+    const values = buildTokenValues({
+      ...baseVars,
+      closeAt: new Date("2026-10-16T23:30:00.000Z"),
+      timezone: "Australia/Sydney",
+    });
+    expect(values.closeat).toBe("October 16, 2026");
   });
 
   it("applies neutral fallbacks for empty known tokens", () => {

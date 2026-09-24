@@ -12,6 +12,9 @@ import { verifyCertification } from "@/services/circle";
 import { getCoachByEmail } from "@/services/hubspot";
 import { validateLeadTime } from "@/lib/workshops/lead-time-validator";
 import { getCoachBioMissingFields } from "@/lib/validations";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
+import { isValidZone } from "@/lib/time";
 
 // Request schemas
 const CreateApprovalSchema = z.object({
@@ -320,6 +323,26 @@ export async function POST(request: NextRequest) {
                     { status: 400 }
                 );
             }
+            const requestedEventTime = typeof body.eventTime === "string" ? body.eventTime : "09:00";
+            const requestedTimezone = typeof body.timezone === "string" ? body.timezone : "America/New_York";
+            if (timezonePickerEnabled()) {
+                if (!isValidZone(requestedTimezone)) {
+                    return NextResponse.json({ error: "Invalid timezone" }, { status: 400 });
+                }
+                try {
+                    resolveEventStartMoment({
+                        eventDate: requestedEventDate,
+                        eventTime: requestedEventTime,
+                        timezone: requestedTimezone,
+                        strict: true,
+                    });
+                } catch {
+                    return NextResponse.json(
+                        { error: "That local time does not exist in the selected timezone." },
+                        { status: 400 },
+                    );
+                }
+            }
 
             const leadTimeValidation = validateLeadTime(
                 requestedEventDate,
@@ -434,8 +457,8 @@ export async function POST(request: NextRequest) {
                     format: body.format || "IN_PERSON",
                     duration: body.duration || "full-day",
                     eventDate: requestedEventDate,
-                    eventTime: body.eventTime || "09:00",
-                    timezone: body.timezone || "America/New_York",
+                    eventTime: requestedEventTime,
+                    timezone: requestedTimezone,
                     venueName: body.venueName || null,
                     venueAddress,
                     virtualLink: body.virtualLink || null,

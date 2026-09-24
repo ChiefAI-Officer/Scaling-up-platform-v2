@@ -10,6 +10,9 @@ import { formatApprovalMessage } from "@/lib/approvals/approval-thread";
 import { parseStoredWorkshopCoupons, parseWorkshopCouponsInput, serializeWorkshopCoupons } from "@/lib/workshops/workshop-coupons";
 import { inngest } from "@/inngest/client";
 import { cancelWorkflowExecutions } from "@/lib/workflows/workflow-service";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
+import { isValidZone } from "@/lib/time";
+import { resolveEventStartMoment } from "@/lib/workflows/resolve-event-start-moment";
 
 const DEFAULT_CANCELLATION_FEE_CENTS = 50000;
 
@@ -196,6 +199,32 @@ export async function PATCH(
     }
 
     const data = validation.data;
+    if (timezonePickerEnabled()) {
+      const nextEventDate = data.eventDate ?? existing.eventDate;
+      const nextEventTime = data.eventTime ?? existing.eventTime;
+      const nextTimezone = data.timezone ?? existing.timezone;
+      if (!isValidZone(nextTimezone)) {
+        return NextResponse.json(
+          { success: false, error: "Select a valid IANA timezone." },
+          { status: 400 },
+        );
+      }
+      if (nextEventTime) {
+        try {
+          resolveEventStartMoment({
+            eventDate: nextEventDate,
+            eventTime: nextEventTime,
+            timezone: nextTimezone,
+            strict: true,
+          });
+        } catch {
+          return NextResponse.json(
+            { success: false, error: "That local time does not exist in the selected timezone." },
+            { status: 400 },
+          );
+        }
+      }
+    }
 
     // Detect date/time change before update (compare against existing values)
     const dateChanged =

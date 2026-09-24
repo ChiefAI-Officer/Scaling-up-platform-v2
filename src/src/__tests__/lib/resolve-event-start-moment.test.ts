@@ -91,6 +91,40 @@ describe("resolveEventStartMoment — BUG-MAY4-1a", () => {
     expect(result.toISOString()).toBe("2026-03-08T14:00:00.000Z");
   });
 
+  it("resolves a valid post-transition time with the new DST offset for legacy callers", () => {
+    expect(resolveEventStartMoment({
+      eventDate: new Date("2026-03-08T00:00:00.000Z"),
+      eventTime: "03:30",
+      timezone: "America/New_York",
+    }).toISOString()).toBe("2026-03-08T07:30:00.000Z");
+  });
+
+  it("rejects a nonexistent workshop wall-clock time during the spring DST gap", () => {
+    expect(() => resolveEventStartMoment({
+      eventDate: new Date("2026-03-08T00:00:00.000Z"),
+      eventTime: "02:30",
+      timezone: "America/New_York",
+      strict: true,
+    })).toThrow(/does not exist/i);
+  });
+
+  it("preserves legacy normalization for flag-off/background callers", () => {
+    expect(resolveEventStartMoment({
+      eventDate: new Date("2026-03-08T00:00:00.000Z"),
+      eventTime: "02:30",
+      timezone: "America/New_York",
+    }).toISOString()).toBe("2026-03-08T07:30:00.000Z");
+  });
+
+  it("chooses the earlier offset for a duplicated fall-back workshop time", () => {
+    expect(resolveEventStartMoment({
+      eventDate: new Date("2026-11-01T00:00:00.000Z"),
+      eventTime: "01:30",
+      timezone: "America/New_York",
+      strict: true,
+    }).toISOString()).toBe("2026-11-01T05:30:00.000Z");
+  });
+
   it("integration with calculateSendDate: Jeff's exact prod failure case now produces 3 PM EDT, not 23:00 UTC the day before", () => {
     // Jeff's prod row from WS-2026-QN5H:
     //   eventDate = 2026-05-04T00:00:00Z (midnight UTC May 4)

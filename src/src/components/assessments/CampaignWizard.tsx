@@ -60,6 +60,13 @@ import { useToast } from "@/components/ui/use-toast";
 import { AddMemberModal } from "@/components/organizations/add-member-modal";
 import type { MemberCreatedResult } from "@/components/organizations/add-member-modal";
 import { ReportStylePicker } from "@/components/assessments/ReportStylePicker";
+import { TimezoneSelect } from "@/components/ui/timezone-select";
+import {
+  DEFAULT_TIMEZONE,
+  detectZone,
+  formatInZone,
+  toInstant,
+} from "@/lib/time";
 import {
   isReportStyleKey,
   resolveReportStylePreviewAnatomy,
@@ -111,6 +118,7 @@ interface Organization {
   id: string;
   name: string;
   externalId: string | null;
+  timezone: string;
 }
 
 interface TemplateSummary {
@@ -180,6 +188,7 @@ interface WizardState {
   openAt: string; // datetime-local string
   endMode: EndMode;
   closeAt: string;
+  timezone: string;
   // Task O UI — per-campaign invitation email overrides. Null/empty = fall back to template default.
   invitationSubject: string;
   invitationBodyMarkdown: string;
@@ -332,6 +341,7 @@ export function CampaignWizard({
   adminOwnedPresentation = false,
   responsiveEnabled = false,
   memberPortalEnabled = false,
+  timezonePickerEnabled = false,
 }: {
   /** Wave D #20 — gate the custom-HTML invitation editor (mirrors the server flag). */
   customHtmlEmailEnabled?: boolean;
@@ -396,6 +406,8 @@ export function CampaignWizard({
   responsiveEnabled?: boolean;
   /** Enables report-access guidance in the quick-add member editor. */
   memberPortalEnabled?: boolean;
+  /** Enables campaign-local IANA time-zone selection and wall-clock conversion. */
+  timezonePickerEnabled?: boolean;
 } = {}) {
   const router = useRouter();
   const { toast } = useToast();
@@ -420,6 +432,7 @@ export function CampaignWizard({
       openAt: formatDateTimeLocal(tomorrow),
       endMode: "OPEN_END",
       closeAt: "",
+      timezone: timezonePickerEnabled ? detectZone() : DEFAULT_TIMEZONE,
       invitationSubject: "",
       invitationBodyMarkdown: "",
       invitationBodyHtml: "",
@@ -539,6 +552,10 @@ export function CampaignWizard({
           openAt: parsed.openAt ?? state.openAt,
           endMode: parsed.endMode === "ENDS_AFTER" ? "ENDS_AFTER" : "OPEN_END",
           closeAt: parsed.closeAt ?? "",
+          timezone:
+            timezonePickerEnabled && typeof parsed.timezone === "string"
+              ? parsed.timezone
+              : state.timezone,
           invitationSubject:
             typeof parsed.invitationSubject === "string"
               ? parsed.invitationSubject
@@ -611,6 +628,7 @@ export function CampaignWizard({
             openAt: snapshot.openAt,
             endMode: snapshot.endMode,
             closeAt: snapshot.closeAt,
+            ...(timezonePickerEnabled ? { timezone: snapshot.timezone } : {}),
             ...(!adminOwnedPresentation
               ? {
                   templateDefaultReportStyle: snapshot.templateDefaultReportStyle,
@@ -627,7 +645,7 @@ export function CampaignWizard({
     } catch {
       setSaveStatus("error");
     }
-  }, [adminOwnedPresentation]);
+  }, [adminOwnedPresentation, timezonePickerEnabled]);
 
   // Debounced auto-save: when state changes (after the draft has been
   // loaded/handled), schedule a PUT in 800ms. Step transitions can flush
@@ -776,12 +794,17 @@ export function CampaignWizard({
           name: state.name,
           templateId: state.templateId,
           organizationId: state.organizationId,
-          openAt: new Date(state.openAt).toISOString(),
+          openAt: timezonePickerEnabled
+            ? toInstant(state.openAt, state.timezone).toISOString()
+            : new Date(state.openAt).toISOString(),
           endMode: state.endMode,
           closeAt:
             state.endMode === "ENDS_AFTER" && state.closeAt
-              ? new Date(state.closeAt).toISOString()
+              ? (timezonePickerEnabled
+                  ? toInstant(state.closeAt, state.timezone)
+                  : new Date(state.closeAt)).toISOString()
               : null,
+          timezone: timezonePickerEnabled ? state.timezone : undefined,
           invitationSubject:
             state.invitationSubject.trim() !== ""
               ? state.invitationSubject.trim()
@@ -1021,7 +1044,7 @@ export function CampaignWizard({
           <OrganizationStep
             responsiveEnabled={responsiveEnabled}
             value={state.organizationId}
-            onChange={({ id, name }) =>
+            onChange={({ id, name, timezone }) =>
               setState((s) => {
                 // Re-selecting the same org must NOT wipe a valid member
                 // selection. Only on an actual company change do we clear the
@@ -1033,6 +1056,7 @@ export function CampaignWizard({
                   ...s,
                   organizationId: id,
                   orgName: name,
+                  ...(timezonePickerEnabled ? { timezone } : {}),
                   respondentIds: [],
                   ceoRespondentId: null,
                 };
@@ -1135,6 +1159,8 @@ export function CampaignWizard({
             resultsEmailEnabled={resultsEmailEnabled}
             coachNotifyEnabled={coachNotifyEnabled}
             onScreenResultsEnabled={onScreenResultsEnabled}
+            timezonePickerEnabled={timezonePickerEnabled}
+            timezone={state.timezone}
             onChange={(patch) => setState((s) => ({ ...s, ...patch }))}
             onBack={back}
             onNext={next}
@@ -1184,7 +1210,7 @@ function OrganizationStep({
 }: {
   responsiveEnabled: boolean;
   value: string;
-  onChange: (v: { id: string; name: string }) => void;
+  onChange: (v: { id: string; name: string; timezone: string }) => void;
   onNext: () => void;
 }) {
   const [orgs, setOrgs] = useState<Organization[]>([]);
@@ -1253,7 +1279,13 @@ function OrganizationStep({
                 name="org"
                 value={o.id}
                 checked={value === o.id}
-                onChange={() => onChange({ id: o.id, name: o.name })}
+                onChange={() =>
+                  onChange({
+                    id: o.id,
+                    name: o.name,
+                    timezone: o.timezone || DEFAULT_TIMEZONE,
+                  })
+                }
                 className="accent-primary"
               />
               <div>
@@ -1908,6 +1940,8 @@ function ScheduleStep({
   resultsEmailEnabled,
   coachNotifyEnabled,
   onScreenResultsEnabled,
+  timezonePickerEnabled,
+  timezone,
   onChange,
   onBack,
   onNext,
@@ -1937,6 +1971,8 @@ function ScheduleStep({
   coachNotifyEnabled: boolean;
   /** Wave OSR (#71) — gate the on-screen-results checkbox (mirrors server flag). */
   onScreenResultsEnabled: boolean;
+  timezonePickerEnabled: boolean;
+  timezone: string;
   onChange: (patch: Partial<WizardState>) => void;
   onBack: () => void;
   onNext: () => void;
@@ -1948,7 +1984,22 @@ function ScheduleStep({
   // trigger.
   const [mountedAt] = useState(() => Date.now());
 
-  const openAtParsed = openAt ? Date.parse(openAt) : NaN;
+  const localInstant = useCallback(
+    (value: string) => {
+      if (!value) return null;
+      try {
+        return timezonePickerEnabled
+          ? toInstant(value, timezone)
+          : new Date(value);
+      } catch {
+        return null;
+      }
+    },
+    [timezonePickerEnabled, timezone],
+  );
+  const openAtParsed = localInstant(openAt)?.getTime() ?? NaN;
+  const openAtInvalid = timezonePickerEnabled && Boolean(openAt) && localInstant(openAt) === null;
+  const closeAtInvalid = timezonePickerEnabled && Boolean(closeAt) && localInstant(closeAt) === null;
   const openAtInPast = useMemo(
     () =>
       inviteTiming === "ON_OPEN" &&
@@ -1959,6 +2010,7 @@ function ScheduleStep({
 
   const valid = useMemo(() => {
     if (!name.trim()) return false;
+    if (openAtInvalid || (endMode === "ENDS_AFTER" && closeAtInvalid)) return false;
     if (!autoSend) {
       // Legacy path (auto-send OFF): the openAt picker is always shown and the
       // open date is required (matching origin/main). No future-only constraint.
@@ -1969,13 +2021,13 @@ function ScheduleStep({
     }
     if (endMode === "ENDS_AFTER") {
       if (!closeAt) return false;
-      const o = Date.parse(openAt);
-      const c = Date.parse(closeAt);
+      const o = localInstant(openAt)?.getTime() ?? NaN;
+      const c = localInstant(closeAt)?.getTime() ?? NaN;
       if (Number.isNaN(o) || Number.isNaN(c)) return false;
       if (c <= o) return false;
     }
     return true;
-  }, [name, openAt, openAtInPast, inviteTiming, endMode, closeAt, autoSend]);
+  }, [name, openAt, openAtInPast, openAtInvalid, inviteTiming, endMode, closeAt, closeAtInvalid, autoSend, localInstant]);
 
   return (
     <div className="space-y-6">
@@ -2007,6 +2059,18 @@ function ScheduleStep({
             maxLength={200}
           />
         </div>
+
+        {timezonePickerEnabled && (
+          <div className="space-y-2">
+            <Label>Time zone</Label>
+            <TimezoneSelect
+              value={timezone}
+              onChange={(nextTimezone) => onChange({ timezone: nextTimezone })}
+              at={localInstant(openAt) ?? new Date()}
+              helperText="Dates and times below use this time zone."
+            />
+          </div>
+        )}
 
         {/* Task 10 — #2/#3: timing radio. Gated on the auto-send flag — hidden
             entirely when auto-send is OFF (dark merge), where the create takes
@@ -2059,6 +2123,16 @@ function ScheduleStep({
               onChange={(e) => onChange({ openAt: e.target.value })}
               required
             />
+            {timezonePickerEnabled && localInstant(openAt) && (
+              <p className="text-xs text-muted-foreground">
+                {formatInZone(localInstant(openAt)!, timezone)}
+              </p>
+            )}
+            {openAtInvalid && (
+              <p role="alert" className="text-xs text-destructive">
+                That local time does not exist in this timezone because the clock moves forward.
+              </p>
+            )}
             {openAtInPast && (
               <p className="text-xs text-destructive" data-testid="openat-past-error">
                 Open time must be in the future when scheduling invitations.
@@ -2113,7 +2187,19 @@ function ScheduleStep({
               onChange={(e) => onChange({ closeAt: e.target.value })}
               required={endMode === "ENDS_AFTER"}
             />
-            {closeAt && openAt && Date.parse(closeAt) <= Date.parse(openAt) && (
+            {timezonePickerEnabled && localInstant(closeAt) && (
+              <p className="text-xs text-muted-foreground">
+                {formatInZone(localInstant(closeAt)!, timezone)}
+              </p>
+            )}
+            {closeAtInvalid && (
+              <p role="alert" className="text-xs text-destructive">
+                That local time does not exist in this timezone because the clock moves forward.
+              </p>
+            )}
+            {closeAt && openAt &&
+              (localInstant(closeAt)?.getTime() ?? Infinity) <=
+                (localInstant(openAt)?.getTime() ?? -Infinity) && (
               <p className="text-xs text-destructive">
                 Close time must be after open time.
               </p>

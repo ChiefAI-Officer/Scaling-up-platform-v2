@@ -1104,6 +1104,7 @@ model TransactionalEmailTemplate {
 model Organization {
   id            String    @id @default(cuid())
   name          String
+  timezone      String    @default("America/New_York")
   externalId    String?   @unique // Prisma full-unique dropped; replaced with partial WHERE NOT NULL via raw SQL
   espertoSuFullCid String? // Wave O — pinned lazily on the org's first successful SU-Full historical import; a later import batch whose file `cid` differs is a wrong-org signal. null = no SU-Full import yet. Additive, default-OFF behind WAVE_O_ESPERTO_SUFULL_IMPORT.
   ownerCoachId  String    // v7.6: single owning coach (replaces v7.5 createdBy + OrganizationMembership)
@@ -1348,6 +1349,7 @@ model AssessmentCampaign {
   openAt              DateTime
   endMode             AssessmentCampaignEndMode
   closeAt             DateTime?
+  timezone            String                       @default("America/New_York")
   closedAt            DateTime?                    // terminal lifecycle transition timestamp
   notifyAdminOnSubmit Boolean                      @default(true)
   // Task O — per-campaign invitation email overrides (null = fall back to template defaults)

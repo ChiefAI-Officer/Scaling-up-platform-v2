@@ -12,6 +12,7 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { timezonePickerEnabled } from "@/lib/time/wave-timezone-flags";
 
 export async function GET(
   request: NextRequest,
@@ -102,13 +103,16 @@ export async function PATCH(
     }
 
     const data = validation.data;
-    const updateData: { name?: string; externalId?: string | null } = {};
+    const updateData: { name?: string; externalId?: string | null; timezone?: string } = {};
     if (data.name !== undefined) updateData.name = data.name;
     if (data.externalId !== undefined) {
       updateData.externalId =
         data.externalId === null || data.externalId === ""
           ? null
           : data.externalId;
+    }
+    if (data.timezone !== undefined && timezonePickerEnabled()) {
+      updateData.timezone = data.timezone;
     }
 
     try {
