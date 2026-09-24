@@ -111,6 +111,105 @@ describe("EditMemberModal", () => {
     ).not.toBeInTheDocument();
   });
 
+  test("R3 shows inferred authority, confirms it independently, and keeps Team changes separate", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          assignments: [
+            {
+              teamId: TEAM_ENG.id,
+              teamName: TEAM_ENG.name,
+              source: "coach",
+              createdBy: "coach-user",
+              createdAt: "2026-09-24T00:00:00.000Z",
+            },
+          ],
+          scopeSize: 2,
+        },
+      }),
+    });
+    const { onUpdated } = renderModal({
+      memberPortalEnabled: true,
+      memberLedTeamsEnabled: true,
+      member: {
+        ...MEMBER,
+        roleType: "teamleader",
+        ledTeams: [
+          {
+            teamId: TEAM_ENG.id,
+            teamName: TEAM_ENG.name,
+            source: "backfill-0040",
+            createdBy: "SYSTEM",
+            createdAt: "2026-09-23T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    fireEvent.change(screen.getByTestId("select-team"), { target: { value: TEAM_MKT.id } });
+    fireEvent.click(screen.getByRole("button", { name: /confirm engineering/i }));
+
+    await waitFor(() => expect(onUpdated).toHaveBeenCalledTimes(1));
+    expect(global.fetch).toHaveBeenCalledWith(
+      `/api/organizations/org-1/respondents/respondent-1/led-teams`,
+      expect.objectContaining({
+        method: "PUT",
+        body: JSON.stringify({ teamIds: [TEAM_ENG.id], confirmTeamIds: [TEAM_ENG.id] }),
+      }),
+    );
+  });
+
+  test("R3 Save submits the selected led teams with member fields", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: {} }),
+    });
+    renderModal({
+      memberLedTeamsEnabled: true,
+      member: { ...MEMBER, roleType: "teamleader", ledTeams: [] },
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /choose led teams/i }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Marketing" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const request = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(JSON.parse(request.body).ledTeamIds).toEqual([TEAM_MKT.id]);
+  });
+
+  test("R3 Team-only save leaves persisted Leads untouched", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({ success: true, data: {} }),
+    });
+    renderModal({
+      memberLedTeamsEnabled: true,
+      member: {
+        ...MEMBER,
+        roleType: "teamleader",
+        ledTeams: [
+          {
+            teamId: TEAM_ENG.id,
+            teamName: TEAM_ENG.name,
+            source: "coach",
+            createdBy: "coach-user",
+            createdAt: "2026-09-24T00:00:00.000Z",
+          },
+        ],
+      },
+    });
+
+    fireEvent.change(screen.getByTestId("select-team"), { target: { value: TEAM_MKT.id } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const request = (global.fetch as jest.Mock).mock.calls[0][1];
+    expect(JSON.parse(request.body)).not.toHaveProperty("ledTeamIds");
+  });
+
   test("warns for an unrecognised stored level without blocking legacy passthrough", async () => {
     (global.fetch as jest.Mock).mockResolvedValue({
       ok: true,

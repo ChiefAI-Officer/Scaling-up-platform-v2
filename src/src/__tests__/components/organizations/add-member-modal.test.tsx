@@ -102,6 +102,42 @@ describe("AddMemberModal", () => {
     ).not.toBeInTheDocument();
   });
 
+  test("R3 replaces the legacy team warning with a Leads control and submits zero-to-many led teams", async () => {
+    (global.fetch as jest.Mock).mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        success: true,
+        data: {
+          id: "created-1",
+          firstName: "Taylor",
+          lastName: "Morgan",
+          email: "taylor@example.com",
+          jobTitle: null,
+          teamId: null,
+          roleType: "teamleader",
+        },
+      }),
+    });
+    renderModal({ memberPortalEnabled: true, memberLedTeamsEnabled: true });
+
+    fireEvent.change(screen.getByLabelText(/first name/i), { target: { value: "Taylor" } });
+    fireEvent.change(screen.getByLabelText(/last name/i), { target: { value: "Morgan" } });
+    fireEvent.change(screen.getByLabelText(/e-?mail/i), { target: { value: "taylor@example.com" } });
+    fireEvent.change(screen.getByTestId("select-level"), { target: { value: "teamleader" } });
+
+    expect(screen.queryByText(/needs a team to grant additional report access/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/Taylor will see only their own reports/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: /choose led teams/i }));
+    fireEvent.click(await screen.findByRole("checkbox", { name: "Engineering" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Design" }));
+    fireEvent.click(screen.getByRole("button", { name: /add member/i }));
+
+    await waitFor(() => expect(global.fetch).toHaveBeenCalledTimes(1));
+    const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+    expect(body.ledTeamIds).toEqual(["team-eng", "team-design"]);
+  });
+
   test("does not render member-access warnings while the member portal is disabled", () => {
     renderModal();
 

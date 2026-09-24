@@ -35,7 +35,7 @@ function isLive(row: ScopedRespondent): boolean {
   return row.deletedAt === null && row.organizationDeletedAt === null;
 }
 
-function descendantTeamIds(rootTeamId: string, teams: TeamNode[]): Set<string> {
+function descendantTeamIds(rootTeamId: string, teams: TeamLeaderScopeTeam[]): Set<string> {
   const included = new Set([rootTeamId]);
   let changed = true;
   while (changed) {
@@ -53,6 +53,48 @@ function descendantTeamIds(rootTeamId: string, teams: TeamNode[]): Set<string> {
     }
   }
   return included;
+}
+
+export type TeamLeaderScopeRespondent = {
+  respondentId: string;
+  teamId: string | null;
+  roleType: string | null;
+  deletedAt: Date | null;
+  organizationDeletedAt: Date | null;
+};
+
+export type TeamLeaderScopeTeam = {
+  teamId: string;
+  parentTeamId: string | null;
+  deletedAt: Date | null;
+};
+
+/** Pure projection shared by server entitlements and the Coach access preview. */
+export function scopeForTeamLeaderRoots(
+  respondentId: string,
+  rootTeamIds: string[],
+  respondents: TeamLeaderScopeRespondent[],
+  teams: TeamLeaderScopeTeam[],
+): Set<string> {
+  const scope = new Set([respondentId]);
+  const teamIds = new Set<string>();
+  for (const rootTeamId of rootTeamIds) {
+    for (const teamId of descendantTeamIds(rootTeamId, teams)) {
+      teamIds.add(teamId);
+    }
+  }
+  for (const respondent of respondents) {
+    if (
+      respondent.deletedAt === null &&
+      respondent.organizationDeletedAt === null &&
+      respondent.teamId !== null &&
+      teamIds.has(respondent.teamId) &&
+      !isCEOFamily(normalizeLevel(respondent.roleType))
+    ) {
+      scope.add(respondent.respondentId);
+    }
+  }
+  return scope;
 }
 
 export type MemberTeamAuthorityMode = "membership" | "led-teams";
@@ -86,23 +128,7 @@ export async function scopeForAuthorityMode(
     reader.respondentsForOrganization(row.organizationId),
     reader.teamsForOrganization(row.organizationId),
   ]);
-  const teamIds = new Set<string>();
-  for (const rootTeamId of rootTeamIds) {
-    for (const teamId of descendantTeamIds(rootTeamId, teams)) {
-      teamIds.add(teamId);
-    }
-  }
-  for (const respondent of respondents) {
-    if (
-      isLive(respondent) &&
-      respondent.teamId !== null &&
-      teamIds.has(respondent.teamId) &&
-      !isCEOFamily(normalizeLevel(respondent.roleType))
-    ) {
-      scope.add(respondent.respondentId);
-    }
-  }
-  return scope;
+  return scopeForTeamLeaderRoots(row.respondentId, rootTeamIds, respondents, teams);
 }
 
 export function scopeFor(

@@ -40,6 +40,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import type { ApiTeamNode } from "./members-teams-view";
 import { RESPONDENT_LEVELS, RESPONDENT_LEVEL_VALUES } from "@/lib/assessments/respondent-levels";
+import {
+  MemberLeadsField,
+  type AuthorityMember,
+  type MemberLedTeamView,
+} from "./member-leads-field";
 
 type FieldError = { id: string; message: string };
 
@@ -56,6 +61,7 @@ export interface EditMemberModalMember {
   jobTitle?: string | null;
   teamId?: string | null;
   roleType?: string | null;
+  ledTeams?: MemberLedTeamView[];
 }
 
 export interface EditMemberModalProps {
@@ -74,6 +80,8 @@ export interface EditMemberModalProps {
   responsiveEnabled?: boolean;
   /** Shows report-access guidance. Resolve this server-side from the member-portal flag. */
   memberPortalEnabled?: boolean;
+  memberLedTeamsEnabled?: boolean;
+  organizationMembers?: AuthorityMember[];
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +96,8 @@ export function EditMemberModal({
   teams,
   responsiveEnabled = false,
   memberPortalEnabled = false,
+  memberLedTeamsEnabled = false,
+  organizationMembers = [],
 }: EditMemberModalProps) {
   const firstNameId = useId();
   const lastNameId  = useId();
@@ -103,6 +113,14 @@ export function EditMemberModal({
   const [jobTitle,        setJobTitle]        = useState(member.jobTitle ?? "");
   const [teamId,          setTeamId]          = useState<string>(member.teamId ?? "");
   const [roleType,        setRoleType]        = useState<string>(member.roleType ?? "");
+  const [ledTeamIds,      setLedTeamIds]      = useState<string[]>(
+    member.ledTeams?.map((edge) => edge.teamId) ?? [],
+  );
+  const [assignments,     setAssignments]     = useState<MemberLedTeamView[]>(member.ledTeams ?? []);
+  const [initialLedTeamIds, setInitialLedTeamIds] = useState<string[]>(
+    member.ledTeams?.map((edge) => edge.teamId) ?? [],
+  );
+  const [confirmingTeamIds, setConfirmingTeamIds] = useState<string[]>([]);
   // Track the value that was in the DB when the modal opened so we can detect
   // if the user actually changed it (needed for legacy-slug preservation below).
   const [initialRoleType, setInitialRoleType] = useState<string | null | undefined>(member.roleType);
@@ -121,11 +139,46 @@ export function EditMemberModal({
       setJobTitle(member.jobTitle ?? "");
       setTeamId(member.teamId ?? "");
       setRoleType(member.roleType ?? "");
+      setLedTeamIds(member.ledTeams?.map((edge) => edge.teamId) ?? []);
+      setAssignments(member.ledTeams ?? []);
+      setInitialLedTeamIds(member.ledTeams?.map((edge) => edge.teamId) ?? []);
+      setConfirmingTeamIds([]);
       setInitialRoleType(member.roleType);
       setError(null);
       setFieldErrors([]);
     }
-  }, [open, member.id, member.email, member.firstName, member.lastName, member.jobTitle, member.teamId, member.roleType]);
+  }, [open, member.id, member.email, member.firstName, member.lastName, member.jobTitle, member.teamId, member.roleType, member.ledTeams]);
+
+  async function confirmInferredTeam(teamIdToConfirm: string) {
+    const persistedTeamIds = assignments.map((edge) => edge.teamId);
+    setError(null);
+    setConfirmingTeamIds((current) => [...current, teamIdToConfirm]);
+    try {
+      const response = await fetch(
+        `/api/organizations/${member.orgId}/respondents/${member.id}/led-teams`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            teamIds: persistedTeamIds,
+            confirmTeamIds: [teamIdToConfirm],
+          }),
+        },
+      );
+      const json = await response.json();
+      if (!response.ok || !json.success) {
+        setError(typeof json.error === "string" ? json.error : "Failed to confirm the inferred team.");
+        return;
+      }
+      const nextAssignments = (json.data?.assignments ?? []) as MemberLedTeamView[];
+      setAssignments(nextAssignments);
+      await onUpdated();
+    } catch {
+      setError("Failed to confirm the inferred team. Please try again.");
+    } finally {
+      setConfirmingTeamIds((current) => current.filter((id) => id !== teamIdToConfirm));
+    }
+  }
 
   // ---------------------------------------------------------------------------
   // Validation + submit
@@ -189,6 +242,12 @@ export function EditMemberModal({
         !(RESPONDENT_LEVEL_VALUES as readonly string[]).includes(initialRoleType);
       if (!isLegacyUnchanged) {
         body.roleType = roleType || null;
+      }
+      const selectedLedTeamsChanged =
+        [...ledTeamIds].sort().join("\u0000") !== [...initialLedTeamIds].sort().join("\u0000");
+      const levelChanged = (roleType || null) !== (initialRoleType || null);
+      if (memberLedTeamsEnabled && (selectedLedTeamsChanged || levelChanged)) {
+        body.ledTeamIds = roleType === "teamleader" ? ledTeamIds : [];
       }
 
       const res = await fetch(
@@ -335,7 +394,7 @@ export function EditMemberModal({
                   </option>
                 ))}
               </select>
-              {memberPortalEnabled && roleType === "teamleader" && !teamId && (
+              {memberPortalEnabled && !memberLedTeamsEnabled && roleType === "teamleader" && !teamId && (
                 <p className="text-xs text-amber-700 dark:text-amber-400">
                   Leadership team member needs a team to grant additional report access.
                 </p>
@@ -380,6 +439,22 @@ export function EditMemberModal({
                   </p>
                 )}
             </div>
+
+            {memberLedTeamsEnabled && (
+              <MemberLeadsField
+                roleType={roleType}
+                memberId={member.id}
+                memberFirstName={firstName.trim()}
+                teams={teams}
+                organizationMembers={organizationMembers}
+                selectedTeamIds={ledTeamIds}
+                assignments={assignments}
+                onChange={setLedTeamIds}
+                onConfirm={confirmInferredTeam}
+                confirmingTeamIds={confirmingTeamIds}
+                disabled={submitting}
+              />
+            )}
 
             {/* ---- Inline error ---- */}
             {!responsiveEnabled && error && (

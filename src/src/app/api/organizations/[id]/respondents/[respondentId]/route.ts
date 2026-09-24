@@ -16,6 +16,9 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { isMemberLedTeamsEnabled } from "@/lib/members/flags";
+import { saveCoachMemberLedTeamsInTransaction } from "@/lib/members/coach-led-teams";
+import { MemberLedTeamWriteError } from "@/lib/members/led-teams";
 
 export async function PATCH(
   request: NextRequest,
@@ -84,6 +87,12 @@ export async function PATCH(
     }
 
     const data = validation.data;
+    if (data.ledTeamIds !== undefined && !isMemberLedTeamsEnabled()) {
+      return NextResponse.json(
+        { success: false, error: "Led teams are not available" },
+        { status: 400 },
+      );
+    }
 
     // Validate teamId if changed.
     if (data.teamId !== undefined && data.teamId !== null) {
@@ -135,11 +144,32 @@ export async function PATCH(
 
     let respondent;
     try {
-      respondent = await db.orgRespondent.update({
-        where: { id: respondentId },
-        data: updateData,
-      });
+      respondent = data.ledTeamIds === undefined
+        ? await db.orgRespondent.update({
+            where: { id: respondentId },
+            data: updateData,
+          })
+        : await db.$transaction(async (tx) => {
+            const updated = await tx.orgRespondent.update({
+              where: { id: respondentId },
+              data: updateData,
+            });
+            await saveCoachMemberLedTeamsInTransaction(tx, {
+              organizationId,
+              respondentId,
+              teamIds: data.ledTeamIds ?? [],
+              actorId: actor.userId,
+              performedBy: actor.email,
+            });
+            return updated;
+          });
     } catch (error) {
+      if (error instanceof MemberLedTeamWriteError) {
+        return NextResponse.json(
+          { success: false, error: error.code },
+          { status: error.code === "respondent-not-found" ? 404 : 400 },
+        );
+      }
       // A changed email can collide with another member's dedupe key in the
       // same org (@@unique([organizationId, dedupeSource, dedupeValue])) — mirror
       // the create route: surface a 409 rather than a raw 500 (#60).

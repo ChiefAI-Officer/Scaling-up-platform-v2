@@ -13,6 +13,9 @@ import {
 } from "@/lib/assessments/access-control";
 import { logAudit } from "@/lib/audit";
 import { RateLimits, withRateLimit } from "@/lib/rate-limit";
+import { isMemberLedTeamsEnabled } from "@/lib/members/flags";
+import { saveCoachMemberLedTeamsInTransaction } from "@/lib/members/coach-led-teams";
+import { MemberLedTeamWriteError } from "@/lib/members/led-teams";
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -57,12 +60,64 @@ export async function GET(
     };
     if (teamId) where.teamId = teamId;
 
+    const ledTeamsEnabled = isMemberLedTeamsEnabled();
     const respondents = await db.orgRespondent.findMany({
       where,
       orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      ...(ledTeamsEnabled
+        ? {
+            include: {
+              ledTeams: {
+                where: { team: { deletedAt: null } },
+                orderBy: { team: { name: "asc" as const } },
+                select: {
+                  teamId: true,
+                  source: true,
+                  createdBy: true,
+                  createdAt: true,
+                  team: { select: { name: true } },
+                },
+              },
+            },
+          }
+        : {}),
     });
 
-    return NextResponse.json({ success: true, data: respondents });
+    if (!ledTeamsEnabled) {
+      return NextResponse.json({ success: true, data: respondents });
+    }
+
+    const authorityMembers = await db.orgRespondent.findMany({
+      where: { organizationId, deletedAt: null },
+      orderBy: [{ lastName: "asc" }, { firstName: "asc" }],
+      select: {
+        id: true,
+        teamId: true,
+        roleType: true,
+        firstName: true,
+        lastName: true,
+      },
+    });
+    const data = respondents.map((respondent) => {
+      const row = respondent as typeof respondent & {
+        ledTeams?: Array<{
+          teamId: string;
+          source: string;
+          createdBy: string;
+          createdAt: Date;
+          team: { name: string };
+        }>;
+      };
+      return {
+        ...row,
+        ledTeams: (row.ledTeams ?? []).map(({ team, ...edge }) => ({
+          ...edge,
+          teamName: team.name,
+        })),
+      };
+    });
+
+    return NextResponse.json({ success: true, data, authorityMembers });
   } catch (error) {
     console.error("Error listing respondents:", error);
     return NextResponse.json(
@@ -125,6 +180,12 @@ export async function POST(
     }
 
     const data = validation.data;
+    if (data.ledTeamIds !== undefined && !isMemberLedTeamsEnabled()) {
+      return NextResponse.json(
+        { success: false, error: "Led teams are not available" },
+        { status: 400 },
+      );
+    }
     const normalizedEmail = normalizeEmail(data.email);
 
     // Validate teamId belongs to org if provided.
@@ -152,8 +213,7 @@ export async function POST(
     const dedupeValue = externalId ?? normalizedEmail;
 
     try {
-      const respondent = await db.orgRespondent.create({
-        data: {
+      const createData = {
           organizationId,
           teamId: data.teamId ?? null,
           roleType: data.roleType ?? null,
@@ -165,8 +225,20 @@ export async function POST(
           externalId,
           dedupeSource,
           dedupeValue,
-        },
-      });
+      };
+      const respondent = data.ledTeamIds === undefined
+        ? await db.orgRespondent.create({ data: createData })
+        : await db.$transaction(async (tx) => {
+            const created = await tx.orgRespondent.create({ data: createData });
+            await saveCoachMemberLedTeamsInTransaction(tx, {
+              organizationId,
+              respondentId: created.id,
+              teamIds: data.ledTeamIds ?? [],
+              actorId: actor.userId,
+              performedBy: actor.email,
+            });
+            return created;
+          });
 
       await logAudit({
         entityType: "OrgRespondent",
@@ -185,6 +257,12 @@ export async function POST(
         { status: 201 }
       );
     } catch (error) {
+      if (error instanceof MemberLedTeamWriteError) {
+        return NextResponse.json(
+          { success: false, error: error.code },
+          { status: error.code === "respondent-not-found" ? 404 : 400 },
+        );
+      }
       if (
         typeof error === "object" &&
         error !== null &&
