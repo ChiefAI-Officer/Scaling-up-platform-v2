@@ -6,6 +6,13 @@ Future entries should be appended at the TOP of the entries section below (newes
 
 ---
 
+<a id="timezone-global-production-enabled"></a>
+### 2026-09-25 — Global timezone handling enabled on Production <!-- ENTRY_ISO:2026-09-25 ENTRY_SLUG:timezone-global-production-enabled -->
+
+**Status: MERGED + MIGRATED + PRODUCTION-ENABLED; REAL-EMAIL ACCEPTANCE PENDING.** PR [#464](https://github.com/ChiefAI-Officer/Scaling-up-platform-v2/pull/464) squash-merged as `b5d81933fc1989e5388bc7a6fdd32c9f5994f77d`. Main CI run `36028725249` passed Build, Migration Safety Gate, and Assessment Email Lease (PostgreSQL). Production deployment `dpl_8kpjZo1BffhHuZqKQco5y5nv5wkK` completed the additive Prisma migration and shipped the exact merge SHA. `WAVE_TZ_ZONE_PICKER_ENABLED=1` was then stored as an encrypted, Production-only Vercel variable through the REST API; `WAVE_TZ_ZONE_PICKER_KILL` remains absent and available for immediate containment. Activated redeploy `dpl_fc3Wbh6mH7Hwf1v1PSdxvGsDVg3w` is Ready and owns both canonical aliases.
+
+**Verification receipt.** Both `https://scaling-up-platform-v2.vercel.app/api/health` and `https://platformtest.scalingup.com/api/health` returned HTTP 200 with a healthy database and safe auth posture after activation. Read-only browser smoke verified `/login`, `/register`, and `/member/sign-in` render complete accessible forms with no console warnings or errors. No Production form was submitted and no Production data was mutated during smoke testing. Per the task's explicit acceptance rule, the email-dependent portion is not considered fully accepted until one real invitation/reminder/deadline-extension email arrives with the intended named timezone and DST-aware abbreviation; that external send was not authorized or performed in this release pass.
+
 <a id="timezone-global-implemented-default-off"></a>
 ### 2026-09-24 — Global timezone handling implemented default-off <!-- ENTRY_ISO:2026-09-24 ENTRY_SLUG:timezone-global-implemented-default-off -->
 
