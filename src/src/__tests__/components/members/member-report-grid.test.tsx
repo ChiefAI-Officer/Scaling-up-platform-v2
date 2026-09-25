@@ -3,7 +3,11 @@ import { MemberReportGrid } from "@/components/members/MemberReportGrid";
 
 const reports = [
   {
+    campaignId: "campaign-one",
+    campaignName: "Q3 Leadership Review",
     submissionId: "one",
+    kind: "personal" as const,
+    href: "/member/reports/one",
     assessmentName: "Rockefeller Habits Checklist",
     reportName: "Q3 Leadership Review",
     personName: null,
@@ -12,7 +16,11 @@ const reports = [
     accent: "orange" as const,
   },
   {
+    campaignId: "campaign-two",
+    campaignName: "Executive Alignment",
     submissionId: "two",
+    kind: "personal" as const,
+    href: "/member/reports/two",
     assessmentName: "Leadership Vision Alignment",
     reportName: "Executive Alignment",
     personName: "Alex Rivera",
@@ -21,6 +29,8 @@ const reports = [
     accent: "blue" as const,
   },
   {
+    campaignId: "group-campaign",
+    campaignName: "Leadership Team Alignment",
     submissionId: "group-campaign",
     assessmentName: "Leadership Vision Alignment",
     reportName: "Leadership Team Alignment",

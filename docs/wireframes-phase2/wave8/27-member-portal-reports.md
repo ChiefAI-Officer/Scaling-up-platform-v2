@@ -1,8 +1,8 @@
 # 27 — Member portal: sign in, your reports, your evaluations
 
-**Revision 2 — 2026-09-18.** Rewritten after the 2026-09-15 recording was watched directly.
-Revision 1 described a flat list of reports behind a completion gate; both were wrong. See
-§ Provenance.
+**Revision 3 — 2026-09-26.** Reports are grouped by campaign in compact disclosure rows after
+Jeff's 2026-09-24 call and 2026-09-25 Slack follow-up. Revision 2 replaced Revision 1's incorrect
+completion gate and established the member portal flow. See § Provenance.
 
 The platform's first surface built for people who are neither coaches nor admins — Jeff's
 "third screen". A **member** is a person a coach has entered into the system. They sign in with
@@ -161,18 +161,31 @@ likely visitor on a phone.
 
 - Heading: **Your reports**
 - Intro: An overview of the reports available to you.
-- **Search field** — filters by report name as you type.
-- **A card grid**, not a list. Each card carries:
-  - the **instrument treatment** — a coloured header block with the instrument name set large,
-    one colour per instrument. Not an image: none exists in the product, and the block does the
-    graphic's whole job here, which is telling a Rockefeller from an LVA at a glance.
-  - the report name
-  - the person it is about, **only when that is not the signed-in member**
+- **Search field** — filters by campaign, instrument, or person name as you type. Matching groups
+  auto-expand; clearing search restores the member's prior disclosure state. A result count reads
+  `{n} reports in {n} campaigns`.
+- Reports are grouped by the campaign's identity, never by its display name. Two campaigns with
+  the same name remain distinct.
+- Campaign groups start collapsed when there is more than one. A single group starts expanded so
+  an ordinary member does not need an extra click.
+- Each campaign header carries:
+  - the instrument name and its colour treatment
+  - the campaign name
+  - the report count and **includes group report** when applicable
+  - the campaign's most recent completion date
   - the company, **only when the member's reports span more than one company**
-  - the date it was completed
-  - a **Group report** marker when it is one
-  - one action: **View report**
-- Sort: most recently completed first. **No pagination** — search only.
+- Expanded groups use compact report rows, ordered **Group report**, the signed-in member's own
+  report, then other people A–Z. Each row has one action: **View report**.
+- Campaign sort: most recent completion in the group first. **No pagination** — search only.
+
+The instrument colour moved from every report card to the campaign header. A campaign pins one
+instrument, so repeating the same colour block inside the group added clutter without adding
+information. Instrument text always remains visible; colour is never the sole identifier.
+
+The accent mapping is explicit by seeded template alias. Rockefeller renders orange, QSP v1/v2
+green, LVA blue, Scaling Up Full brown, and Five Dysfunctions / Scaling Up Quick purple. Orange
+and green use their darker accessible values (`#a15c00` and `#1f7a3a`). Unknown aliases use the
+declared purple fallback.
 
 ### What is deliberately not copied from Esperto
 
@@ -353,12 +366,10 @@ password affordance to explain away.
 
 **Home** is two panels on the same ground, weighted equally. Nothing else competes.
 
-**Reports** is a card grid: text-first cards, generous spacing, one action each.
-
-**The card graphic is per instrument, not per report.** One static image for every Rockefeller
-report, one for every LVA, and so on. Per-report thumbnails would need a rendering pipeline we do
-not have, and the graphic's job here is scanning — telling a Rockefeller from an LVA at a glance
-— which a per-instrument image does completely.
+**Reports** is a compact campaign disclosure list: quiet bordered groups, generous spacing, and
+one action per report row. The instrument colour and name live once in the campaign header,
+where they provide the same at-a-glance scanning without repeating a large block for every
+report.
 
 At 375 px everything reflows to one column with actions on their own line. Nothing clips or
 overlaps.
@@ -426,6 +437,10 @@ These are written as testable assertions deliberately.
 
 ## Provenance
 
+- Jeff's 2026-09-24 call and 2026-09-25 Slack request: group reports by campaign, start campaigns
+  collapsed, and preserve the useful instrument colour coding. The implementation wireframe and
+  decision record are archived in `MEMBER-REPORTS-GROUPING-SPEC-2026-09-26.md` and its companion
+  eight-board visual set.
 - Jeff's Slack request, 2026-09-15: token-based member login to a dashboard of reports.
 - **The 2026-09-15 recording, watched directly 2026-09-18** — the source for the entry gate
   (05:09), the hierarchy (04:07), the home screen and reports grid (03:47, 05:05), and the pilot

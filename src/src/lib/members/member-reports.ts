@@ -11,16 +11,30 @@ import {
   isGroupReportEnabled,
 } from "@/lib/assessments/wave-f-flags";
 
+export type MemberReportAccent = "purple" | "orange" | "blue" | "green" | "brown";
+
 export type MemberReportListItem = {
+  campaignId: string;
+  campaignName: string;
   submissionId: string;
-  kind?: "personal" | "group";
-  href?: string;
+  kind: "personal" | "group";
+  href: string;
   assessmentName: string;
   reportName: string;
   personName: string | null;
   companyName: string | null;
   completedAt: Date;
-  accent: "purple" | "orange" | "blue" | "green" | "brown";
+  accent: MemberReportAccent;
+};
+
+export type MemberReportGroup = {
+  campaignId: string;
+  campaignName: string;
+  assessmentName: string;
+  companyName: string | null;
+  completedAt: Date;
+  accent: MemberReportAccent;
+  reports: MemberReportListItem[];
 };
 
 type ReportRow = {
@@ -54,22 +68,87 @@ type MemberReportsDb = {
   $transaction<T>(callback: (tx: MemberReportsTx) => Promise<T>): Promise<T>;
 };
 
-function accentFor(alias: string): MemberReportListItem["accent"] {
-  if (alias.includes("rockefeller")) return "orange";
-  if (alias.includes("leadership") || alias.includes("lva")) return "blue";
-  if (alias.includes("quarterly")) return "green";
-  if (alias.includes("full")) return "brown";
-  return "purple";
+export const MEMBER_REPORT_ACCENT_BY_ALIAS: Readonly<
+  Record<string, MemberReportAccent>
+> = Object.freeze({
+  RockHabits: "orange",
+  "qsp-v1": "green",
+  "qsp-v2": "green",
+  "leadership-vision-alignment": "blue",
+  "scaling-up-full": "brown",
+  "five-dysfunctions": "purple",
+  "scaling-up-quick": "purple",
+});
+
+export const MEMBER_REPORT_DEFAULT_ACCENT: MemberReportAccent = "purple";
+
+function accentFor(alias: string): MemberReportAccent {
+  return MEMBER_REPORT_ACCENT_BY_ALIAS[alias] ?? MEMBER_REPORT_DEFAULT_ACCENT;
+}
+
+function reportOrder(left: MemberReportListItem, right: MemberReportListItem): number {
+  const rank = (report: MemberReportListItem) => {
+    if (report.kind === "group") return 0;
+    if (report.personName === null) return 1;
+    return 2;
+  };
+  const rankDifference = rank(left) - rank(right);
+  if (rankDifference !== 0) return rankDifference;
+  return (left.personName ?? "").localeCompare(right.personName ?? "", "en", {
+    sensitivity: "base",
+  });
+}
+
+export function groupMemberReports(
+  reports: MemberReportListItem[],
+): MemberReportGroup[] {
+  const byCampaign = new Map<string, MemberReportListItem[]>();
+  for (const report of reports) {
+    const campaignReports = byCampaign.get(report.campaignId) ?? [];
+    campaignReports.push(report);
+    byCampaign.set(report.campaignId, campaignReports);
+  }
+
+  return [...byCampaign.entries()]
+    .map(([campaignId, campaignReports]) => {
+      const first = campaignReports[0];
+      const completedAt = campaignReports.reduce(
+        (latest, report) =>
+          report.completedAt.getTime() > latest.getTime()
+            ? report.completedAt
+            : latest,
+        first.completedAt,
+      );
+      return {
+        campaignId,
+        campaignName: first.campaignName,
+        assessmentName: first.assessmentName,
+        companyName: first.companyName,
+        completedAt,
+        accent: first.accent,
+        reports: [...campaignReports].sort(reportOrder),
+      };
+    })
+    .sort(
+      (left, right) =>
+        right.completedAt.getTime() - left.completedAt.getTime(),
+    );
 }
 
 export async function listMemberReports(
   db: MemberReportsDb,
   normalizedEmail: string,
-): Promise<{ reports: MemberReportListItem[]; hasOpenEvaluations: boolean }> {
+): Promise<{
+  reports: MemberReportListItem[];
+  groups: MemberReportGroup[];
+  hasOpenEvaluations: boolean;
+}> {
   return db.$transaction(async (tx) => {
     const identity = await resolveMemberIdentity(tx, normalizedEmail);
     const ownIds = identity.members.map((member) => member.respondentId);
-    if (ownIds.length === 0) return { reports: [], hasOpenEvaluations: false };
+    if (ownIds.length === 0) {
+      return { reports: [], groups: [], hasOpenEvaluations: false };
+    }
 
     const entitledIds = await entitlementFor(
       identity.members,
@@ -108,6 +187,8 @@ export async function listMemberReports(
     const personalReports: MemberReportListItem[] = rows
       .filter((row) => row.respondentId !== null && entitledIds.has(row.respondentId))
       .map((row) => ({
+        campaignId: row.campaign.id,
+        campaignName: row.campaign.name?.trim() || row.campaign.template.name,
         submissionId: row.id,
         kind: "personal",
         href: `/member/reports/${encodeURIComponent(row.id)}`,
@@ -148,6 +229,8 @@ export async function listMemberReports(
         continue;
       }
       groupReports.push({
+        campaignId: campaign.id,
+        campaignName: campaign.name?.trim() || campaign.template.name,
         submissionId: campaign.id,
         kind: "group",
         href: `/member/reports/team/${encodeURIComponent(campaign.id)}`,
@@ -170,10 +253,12 @@ export async function listMemberReports(
           campaign: { deletedAt: null },
         },
       })) > 0;
-    return {
-      reports: [...personalReports, ...groupReports].sort(
+    const reports = [...personalReports, ...groupReports].sort(
         (left, right) => right.completedAt.getTime() - left.completedAt.getTime(),
-      ),
+      );
+    return {
+      reports,
+      groups: groupMemberReports(reports),
       hasOpenEvaluations,
     };
   });

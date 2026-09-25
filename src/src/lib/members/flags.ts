@@ -18,3 +18,9 @@ export function isMemberLedTeamsEnabled(): boolean {
   if (isOn(process.env.WAVE_MP_LED_TEAMS_KILL)) return false;
   return isOn(process.env.WAVE_MP_LED_TEAMS_ENABLED);
 }
+
+/** Whether the Member report list uses campaign-grouped disclosure rows. */
+export function isMemberReportGroupingEnabled(): boolean {
+  if (isOn(process.env.WAVE_MP_REPORT_GROUPING_KILL)) return false;
+  return isOn(process.env.WAVE_MP_REPORT_GROUPING_ENABLED);
+}

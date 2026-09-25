@@ -33,7 +33,7 @@ export function MemberReportGrid({ reports }: { reports: MemberReportListItem[] 
       </label>
       <div className="mt-6 grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         {visible.map((report) => (
-          <article key={report.submissionId} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <article key={`${report.kind}:${report.submissionId}`} className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
             <div className={`${accentClasses[report.accent]} min-h-28 p-5 text-xl font-bold text-white`}>
               {report.assessmentName}
             </div>
@@ -47,7 +47,7 @@ export function MemberReportGrid({ reports }: { reports: MemberReportListItem[] 
               <p className="text-sm text-slate-500">Completed {report.completedAt.toLocaleDateString("en-US", { dateStyle: "medium" })}</p>
               <Link
                 className="inline-flex rounded-lg bg-[#522583] px-4 py-2 font-semibold text-white"
-                href={report.href ?? `/member/reports/${encodeURIComponent(report.submissionId)}`}
+                href={report.href}
               >
                 View report
               </Link>

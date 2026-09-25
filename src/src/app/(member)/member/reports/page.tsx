@@ -3,7 +3,11 @@ import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { MemberPortalHeader } from "@/components/members/MemberPortalHeader";
 import { MemberReportGrid } from "@/components/members/MemberReportGrid";
-import { isMemberPortalEnabled } from "@/lib/members/flags";
+import { MemberReportGroups } from "@/components/members/MemberReportGroups";
+import {
+  isMemberPortalEnabled,
+  isMemberReportGroupingEnabled,
+} from "@/lib/members/flags";
 import { listMemberReports } from "@/lib/members/member-reports";
 import { resolveMemberIdentity } from "@/lib/members/identity";
 import { requireMemberSession } from "@/lib/members/session";
@@ -37,7 +41,11 @@ export default async function MemberReportsPage() {
         <h1 className="text-3xl font-bold">Your reports</h1>
         <p className="mt-2 mb-6 text-slate-600">An overview of the reports available to you.</p>
         {model.reports.length > 0 ? (
-          <MemberReportGrid reports={model.reports} />
+          isMemberReportGroupingEnabled() ? (
+            <MemberReportGroups groups={model.groups} />
+          ) : (
+            <MemberReportGrid reports={model.reports} />
+          )
         ) : (
           <section className="rounded-2xl border border-slate-200 bg-white p-8 text-center">
             <h2 className="text-2xl font-semibold">No reports yet</h2>
