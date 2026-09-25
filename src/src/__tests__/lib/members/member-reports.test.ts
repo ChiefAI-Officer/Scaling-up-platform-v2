@@ -62,7 +62,7 @@ const rows = [
   },
 ];
 
-function fixture(roleType: string) {
+function fixture(roleType: string, reportRows = rows) {
   const tx = {
     orgRespondent: {
       findMany: jest.fn(async (args: { where?: { organizationId?: string } }) =>
@@ -75,7 +75,7 @@ function fixture(roleType: string) {
       ),
     },
     orgTeam: { findMany: jest.fn().mockResolvedValue([]) },
-    assessmentSubmission: { findMany: jest.fn().mockResolvedValue(rows) },
+    assessmentSubmission: { findMany: jest.fn().mockResolvedValue(reportRows) },
     assessmentInvitation: { count: jest.fn().mockResolvedValue(0) },
   };
   return {
@@ -91,6 +91,8 @@ describe("listMemberReports hierarchy", () => {
 
   afterEach(() => {
     delete process.env.WAVE_F_GROUP_REPORT_ENABLED;
+    delete process.env.WAVE_MP_REPORT_GROUPING_ENABLED;
+    delete process.env.WAVE_MP_REPORT_GROUPING_KILL;
   });
 
   it("lists every entitled personal report and one distinct group report for a CEO", async () => {
@@ -127,6 +129,52 @@ describe("listMemberReports hierarchy", () => {
 
     const query = testContext.tx.assessmentSubmission.findMany.mock.calls[0]?.[0];
     expect(query?.where).not.toHaveProperty("submittedAt");
+  });
+
+  it("shows company labels only when visible reports span organizations", async () => {
+    const f = fixture("employee");
+    f.tx.orgRespondent.findMany.mockResolvedValue([
+      {
+        id: "ceo",
+        organizationId: "org-1",
+        teamId: null,
+        roleType: "employee",
+      },
+      {
+        id: "other-org-member",
+        organizationId: "org-2",
+        teamId: null,
+        roleType: "employee",
+      },
+    ]);
+
+    const result = await listMemberReports(f.db as never, "member@example.com");
+
+    expect(result.reports).toHaveLength(1);
+    expect(result.reports[0].companyName).toBeNull();
+  });
+
+  it("keeps legacy accents flag-off and uses corrected accents flag-on", async () => {
+    const rockefellerRows = rows.map((row) => ({
+      ...row,
+      campaign: {
+        ...row.campaign,
+        template: { name: "Rockefeller Habits", alias: "RockHabits" },
+      },
+    }));
+
+    const legacy = await listMemberReports(
+      fixture("employee", rockefellerRows).db as never,
+      "member@example.com",
+    );
+    expect(legacy.reports[0].accent).toBe("purple");
+
+    process.env.WAVE_MP_REPORT_GROUPING_ENABLED = "1";
+    const grouped = await listMemberReports(
+      fixture("employee", rockefellerRows).db as never,
+      "member@example.com",
+    );
+    expect(grouped.reports[0].accent).toBe("orange");
   });
 });
 

@@ -438,9 +438,9 @@ These are written as testable assertions deliberately.
 ## Provenance
 
 - Jeff's 2026-09-24 call and 2026-09-25 Slack request: group reports by campaign, start campaigns
-  collapsed, and preserve the useful instrument colour coding. The implementation wireframe and
-  decision record are archived in `MEMBER-REPORTS-GROUPING-SPEC-2026-09-26.md` and its companion
-  eight-board visual set.
+  collapsed, and preserve the useful instrument colour coding. The implementation brief and
+  eight-board visual study supplied for the change are incorporated into this Revision 3 screen
+  contract; this document remains the durable source of truth.
 - Jeff's Slack request, 2026-09-15: token-based member login to a dashboard of reports.
 - **The 2026-09-15 recording, watched directly 2026-09-18** — the source for the entry gate
   (05:09), the hierarchy (04:07), the home screen and reports grid (03:47, 05:05), and the pilot

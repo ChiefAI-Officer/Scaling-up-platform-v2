@@ -10,6 +10,7 @@ import {
   isGroupReportAlias,
   isGroupReportEnabled,
 } from "@/lib/assessments/wave-f-flags";
+import { isMemberReportGroupingEnabled } from "@/lib/members/flags";
 
 export type MemberReportAccent = "purple" | "orange" | "blue" | "green" | "brown";
 
@@ -82,8 +83,22 @@ export const MEMBER_REPORT_ACCENT_BY_ALIAS: Readonly<
 
 export const MEMBER_REPORT_DEFAULT_ACCENT: MemberReportAccent = "purple";
 
-function accentFor(alias: string): MemberReportAccent {
-  return MEMBER_REPORT_ACCENT_BY_ALIAS[alias] ?? MEMBER_REPORT_DEFAULT_ACCENT;
+function legacyAccentFor(alias: string): MemberReportAccent {
+  if (alias.includes("rockefeller")) return "orange";
+  if (alias.includes("leadership") || alias.includes("lva")) return "blue";
+  if (alias.includes("quarterly")) return "green";
+  if (alias.includes("full")) return "brown";
+  return MEMBER_REPORT_DEFAULT_ACCENT;
+}
+
+function accentFor(alias: string, useCorrectedAccents: boolean): MemberReportAccent {
+  return useCorrectedAccents
+    ? MEMBER_REPORT_ACCENT_BY_ALIAS[alias] ?? MEMBER_REPORT_DEFAULT_ACCENT
+    : legacyAccentFor(alias);
+}
+
+function campaignDisplayName(campaign: ReportRow["campaign"]): string {
+  return campaign.name?.trim() || campaign.template.name;
 }
 
 function reportOrder(left: MemberReportListItem, right: MemberReportListItem): number {
@@ -155,7 +170,7 @@ export async function listMemberReports(
       createMemberEntitlementReader(tx),
     );
     const organizationIds = [...new Set(identity.members.map((member) => member.organizationId))];
-    const organizationCount = organizationIds.length;
+    const useCorrectedAccents = isMemberReportGroupingEnabled();
     const submissionQuery = {
       where: {
         respondentId: { not: null },
@@ -184,24 +199,33 @@ export async function listMemberReports(
     } satisfies Prisma.AssessmentSubmissionFindManyArgs;
     const rows = await tx.assessmentSubmission.findMany(submissionQuery);
     const ownSet = new Set(ownIds);
-    const personalReports: MemberReportListItem[] = rows
-      .filter((row) => row.respondentId !== null && entitledIds.has(row.respondentId))
+    const visibleRows = rows.filter(
+      (row) => row.respondentId !== null && entitledIds.has(row.respondentId),
+    );
+    const visibleOrganizationIds = new Set(
+      visibleRows.flatMap((row) =>
+        row.campaign.organizationId ? [row.campaign.organizationId] : [],
+      ),
+    );
+    const showCompanyName = visibleOrganizationIds.size > 1;
+    const personalReports: MemberReportListItem[] = visibleRows
       .map((row) => ({
         campaignId: row.campaign.id,
-        campaignName: row.campaign.name?.trim() || row.campaign.template.name,
+        campaignName: campaignDisplayName(row.campaign),
         submissionId: row.id,
         kind: "personal",
         href: `/member/reports/${encodeURIComponent(row.id)}`,
         assessmentName: row.campaign.template.name,
-        reportName: row.campaign.name?.trim() || row.campaign.template.name,
+        reportName: campaignDisplayName(row.campaign),
         personName:
           row.respondentId && !ownSet.has(row.respondentId) && row.respondent
             ? `${row.respondent.firstName} ${row.respondent.lastName}`.trim()
             : null,
-        companyName:
-          organizationCount > 1 ? row.campaign.organization?.name ?? null : null,
+        companyName: showCompanyName
+          ? row.campaign.organization?.name ?? null
+          : null,
         completedAt: row.submittedAt,
-        accent: accentFor(row.campaign.template.alias),
+        accent: accentFor(row.campaign.template.alias, useCorrectedAccents),
       }));
 
     const cohortByCampaign = new Map<string, ReportRow[]>();
@@ -230,17 +254,18 @@ export async function listMemberReports(
       }
       groupReports.push({
         campaignId: campaign.id,
-        campaignName: campaign.name?.trim() || campaign.template.name,
+        campaignName: campaignDisplayName(campaign),
         submissionId: campaign.id,
         kind: "group",
         href: `/member/reports/team/${encodeURIComponent(campaign.id)}`,
         assessmentName: campaign.template.name,
-        reportName: campaign.name?.trim() || campaign.template.name,
+        reportName: campaignDisplayName(campaign),
         personName: null,
-        companyName:
-          organizationCount > 1 ? campaign.organization?.name ?? null : null,
+        companyName: showCompanyName
+          ? campaign.organization?.name ?? null
+          : null,
         completedAt: first.submittedAt,
-        accent: accentFor(campaign.template.alias),
+        accent: accentFor(campaign.template.alias, useCorrectedAccents),
       });
     }
 

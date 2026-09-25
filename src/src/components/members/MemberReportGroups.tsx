@@ -4,17 +4,9 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight } from "lucide-react";
 import type {
-  MemberReportAccent,
   MemberReportGroup,
 } from "@/lib/members/member-reports";
-
-const accentClasses: Record<MemberReportAccent, string> = {
-  purple: "bg-[#522583]",
-  orange: "bg-[#a15c00]",
-  blue: "bg-[#008bd2]",
-  green: "bg-[#1f7a3a]",
-  brown: "bg-[#946b36]",
-};
+import { groupedMemberReportAccentClasses } from "@/components/members/member-report-accents";
 
 function regionId(campaignId: string): string {
   return `member-report-campaign-${campaignId.replace(/[^a-zA-Z0-9_-]/g, "-")}`;
@@ -98,7 +90,7 @@ export function MemberReportGroups({ groups }: { groups: MemberReportGroup[] }) 
                 />
                 <span className="min-w-0 flex-1 sm:flex sm:items-center sm:gap-4">
                   <span
-                    className={`${accentClasses[group.accent]} inline-block max-w-full truncate rounded-full px-3 py-1 text-sm font-semibold text-white sm:max-w-52 sm:shrink-0`}
+                    className={`${groupedMemberReportAccentClasses[group.accent]} inline-block max-w-full truncate rounded-full px-3 py-1 text-sm font-semibold text-white sm:max-w-52 sm:shrink-0`}
                   >
                     {group.assessmentName}
                   </span>
