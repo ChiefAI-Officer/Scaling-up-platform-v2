@@ -170,7 +170,7 @@ export async function listMemberReports(
       createMemberEntitlementReader(tx),
     );
     const organizationIds = [...new Set(identity.members.map((member) => member.organizationId))];
-    const useCorrectedAccents = isMemberReportGroupingEnabled();
+    const groupingEnabled = isMemberReportGroupingEnabled();
     const submissionQuery = {
       where: {
         respondentId: { not: null },
@@ -207,7 +207,9 @@ export async function listMemberReports(
         row.campaign.organizationId ? [row.campaign.organizationId] : [],
       ),
     );
-    const showCompanyName = visibleOrganizationIds.size > 1;
+    const showCompanyName = groupingEnabled
+      ? visibleOrganizationIds.size > 1
+      : organizationIds.length > 1;
     const personalReports: MemberReportListItem[] = visibleRows
       .map((row) => ({
         campaignId: row.campaign.id,
@@ -225,7 +227,7 @@ export async function listMemberReports(
           ? row.campaign.organization?.name ?? null
           : null,
         completedAt: row.submittedAt,
-        accent: accentFor(row.campaign.template.alias, useCorrectedAccents),
+        accent: accentFor(row.campaign.template.alias, groupingEnabled),
       }));
 
     const cohortByCampaign = new Map<string, ReportRow[]>();
@@ -265,7 +267,7 @@ export async function listMemberReports(
           ? campaign.organization?.name ?? null
           : null,
         completedAt: first.submittedAt,
-        accent: accentFor(campaign.template.alias, useCorrectedAccents),
+        accent: accentFor(campaign.template.alias, groupingEnabled),
       });
     }
 

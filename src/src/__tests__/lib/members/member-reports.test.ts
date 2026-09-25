@@ -131,27 +131,40 @@ describe("listMemberReports hierarchy", () => {
     expect(query?.where).not.toHaveProperty("submittedAt");
   });
 
-  it("shows company labels only when visible reports span organizations", async () => {
-    const f = fixture("employee");
-    f.tx.orgRespondent.findMany.mockResolvedValue([
-      {
-        id: "ceo",
-        organizationId: "org-1",
-        teamId: null,
-        roleType: "employee",
-      },
-      {
-        id: "other-org-member",
-        organizationId: "org-2",
-        teamId: null,
-        roleType: "employee",
-      },
-    ]);
+  it("preserves legacy company labels flag-off and uses visible reports flag-on", async () => {
+    const multiOrganizationFixture = () => {
+      const f = fixture("employee");
+      f.tx.orgRespondent.findMany.mockResolvedValue([
+        {
+          id: "ceo",
+          organizationId: "org-1",
+          teamId: null,
+          roleType: "employee",
+        },
+        {
+          id: "other-org-member",
+          organizationId: "org-2",
+          teamId: null,
+          roleType: "employee",
+        },
+      ]);
+      return f;
+    };
 
-    const result = await listMemberReports(f.db as never, "member@example.com");
+    const legacy = await listMemberReports(
+      multiOrganizationFixture().db as never,
+      "member@example.com",
+    );
+    expect(legacy.reports).toHaveLength(1);
+    expect(legacy.reports[0].companyName).toBe("Acme");
 
-    expect(result.reports).toHaveLength(1);
-    expect(result.reports[0].companyName).toBeNull();
+    process.env.WAVE_MP_REPORT_GROUPING_ENABLED = "1";
+    const grouped = await listMemberReports(
+      multiOrganizationFixture().db as never,
+      "member@example.com",
+    );
+    expect(grouped.reports).toHaveLength(1);
+    expect(grouped.reports[0].companyName).toBeNull();
   });
 
   it("keeps legacy accents flag-off and uses corrected accents flag-on", async () => {
